@@ -163,7 +163,7 @@ elif choice == "Evaluador":
             c.execute("SELECT username FROM usuarios WHERE rol='Agente' AND campaña=? AND estado='Activo'", (a_sel,))
             ags = [r[0] for r in c.fetchall()]
             ag_sel = st.selectbox("Agente", ags) if ags else st.text_input("Nombre Agente (Manual)")
-        with c3: f_ev = st.date_input("Fecha de Evento", datetime.now())
+        with c3: f_ev = st.date_input("Fecha de la Interacción", datetime.now())
         with c4: t_eval = st.selectbox("Evaluado por:", ["Calidad", "Operaciones"])
 
         c.execute("SELECT id, pregunta, puntos, tipo FROM scorecards WHERE area=?", (a_sel,))
