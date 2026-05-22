@@ -9,20 +9,16 @@ import shutil
 # Configuración de la página
 st.set_page_config(page_title="QualityScore Enterprise Edition", layout="wide")
 
-# --- 🗄️ AJUSTE PARA NUBE (Persistencia Temporal) ---
-# En la nube, copiamos la DB a /tmp para poder escribir en ella
+# --- 🗄️ LOGICA DE BASE DE DATOS PARA NUBE ---
 DB_ORIGINAL = 'calidad.db'
 DB_NUBE = '/tmp/calidad.db'
 
+# Copiamos la base de datos a una ubicación con permisos de escritura en la nube
 if not os.path.exists(DB_NUBE):
     if os.path.exists(DB_ORIGINAL):
         shutil.copy2(DB_ORIGINAL, DB_NUBE)
-    else:
-        # Si no existe, se creará vacía en /tmp
-        pass
 
 def get_connection():
-    # Siempre conectamos a la versión de /tmp que permite escritura
     return sqlite3.connect(DB_NUBE, check_same_thread=False)
 
 def init_db():
@@ -39,7 +35,6 @@ def init_db():
     c.execute('''CREATE TABLE IF NOT EXISTS usuarios 
                  (id INTEGER PRIMARY KEY, username TEXT UNIQUE, password TEXT, rol TEXT, campaña TEXT, estado TEXT DEFAULT 'Activo')''')
     
-    # Migración rápida
     try:
         c.execute("ALTER TABLE evaluaciones ADD COLUMN tipo_evaluador TEXT DEFAULT 'Calidad'")
     except:
@@ -53,7 +48,6 @@ def init_db():
     conn.close()
 
 init_db()
-
 
 # --- 🔑 LÓGICA DE SESIÓN ---
 if "autenticado" not in st.session_state:
@@ -88,7 +82,6 @@ if st.sidebar.button("🚪 Cerrar Sesión"):
     st.session_state["autenticado"] = False
     st.rerun()
 
-# Definición de Menú según Rol
 if user_data['rol'] == 'Administrador':
     menu = ["Dashboard", "Evaluador", "Config Scorecards", "Gestión Campañas", "Gestión Usuarios"]
 elif user_data['rol'] == 'Evaluador':
@@ -203,9 +196,9 @@ elif choice == "Evaluador":
             st.success("Guardado correctamente.")
     conn.close()
 
-# --- GESTIÓN (Simplificada para ahorro de espacio) ---
+# --- ⚙️ CONFIG SCORECARDS ---
 elif choice == "Config Scorecards":
-    st.header("⚙️ Configuración")
+    st.header("⚙️ Configuración de Scorecards")
     conn = get_connection()
     c = conn.cursor()
     c.execute("SELECT nombre FROM campañas WHERE estado='Activo'")
@@ -217,12 +210,82 @@ elif choice == "Config Scorecards":
             f_p = st.text_input("Criterio")
             f_t = st.selectbox("Tipo", ["Escala (Slider)", "Sí / No"])
             f_pts = st.number_input("Puntos", 1, 100, 10)
-            if st.form_submit_button("Añadir"):
+            if st.form_submit_button("Añadir Criterio"):
                 c.execute("INSERT INTO scorecards (area, pregunta, puntos, tipo) VALUES (?,?,?,?)", (f_c, f_p, f_pts, f_t))
                 conn.commit()
-                st.success("Añadido.")
+                st.success("Criterio añadido.")
     st.dataframe(pd.read_sql_query("SELECT * FROM scorecards", conn), use_container_width=True)
     conn.close()
 
-# Nota: Los módulos de Usuarios y Campañas se mantienen igual que en la versión anterior.
-# Se recomienda subir el archivo calidad.db inicial con el usuario admin creado.
+# --- 📁 GESTIÓN CAMPAÑAS ---
+elif choice == "Gestión Campañas":
+    st.header("📁 Administración de Campañas")
+    conn = get_connection()
+    c = conn.cursor()
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        st.subheader("Acciones")
+        modo = st.radio("Operación:", ["Nueva", "Editar Existente"])
+        if modo == "Nueva":
+            nc = st.text_input("Nombre Campaña")
+            if st.button("Guardar Nueva"):
+                if nc:
+                    try:
+                        c.execute("INSERT INTO campañas (nombre) VALUES (?)", (nc,))
+                        conn.commit(); st.success("Creada"); st.rerun()
+                    except: st.error("Error al crear.")
+        else:
+            c.execute("SELECT id, nombre FROM campañas")
+            lista = c.fetchall()
+            if lista:
+                sel_edit = st.selectbox("Seleccionar:", [f"{r[0]}-{r[1]}" for r in lista])
+                nuevo_n = st.text_input("Nuevo Nombre")
+                if st.button("Actualizar"):
+                    c.execute("UPDATE campañas SET nombre=? WHERE id=?", (nuevo_n, sel_edit.split("-")[0]))
+                    conn.commit(); st.rerun()
+
+    with col2:
+        df_c = pd.read_sql_query("SELECT * FROM campañas", conn)
+        st.dataframe(df_c, use_container_width=True)
+    conn.close()
+
+# --- 👥 GESTIÓN USUARIOS ---
+elif choice == "Gestión Usuarios":
+    st.header("👥 Gestión de Usuarios")
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT nombre FROM campañas WHERE estado='Activo'")
+    camps_avail = [r[0] for r in c.fetchall()]
+    
+    col_u1, col_u2 = st.columns([1, 2])
+    with col_u1:
+        modo_u = st.radio("Operación:", ["Nuevo", "Editar"])
+        if modo_u == "Nuevo":
+            nu = st.text_input("Username")
+            np = st.text_input("Password")
+            nr = st.selectbox("Rol", ["Administrador", "Evaluador", "Agente"])
+            nc_u = st.selectbox("Campaña", ["Todas"] + camps_avail)
+            if st.button("Registrar Usuario"):
+                c.execute("INSERT INTO usuarios (username, password, rol, campaña) VALUES (?,?,?,?)", (nu, np, nr, nc_u))
+                conn.commit(); st.success("Registrado"); st.rerun()
+    with col_u2:
+        df_u = pd.read_sql_query("SELECT id, username, rol, campaña, estado FROM usuarios", conn)
+        st.dataframe(df_u, use_container_width=True)
+    conn.close()
+
+# --- 📈 VISTA AGENTE ---
+elif choice == "Mis Calificaciones":
+    st.header(f"📈 Panel de Resultados: {user_data['user']}")
+    conn = get_connection()
+    query = "SELECT * FROM evaluaciones WHERE LOWER(agente) = LOWER(?)"
+    df_raw = pd.read_sql_query(query, conn, params=(user_data['user'],))
+    conn.close()
+    if df_raw.empty:
+        st.warning("Sin evaluaciones registradas.")
+    else:
+        df_raw['observaciones'] = df_raw['observaciones'].fillna('Sin comentarios')
+        df_resumen = df_raw.groupby(['fecha_registro', 'area', 'observaciones']).agg(
+            Obtenido=('puntos_obtenidos', 'sum'), Maximo=('puntos_maximos', 'sum')
+        ).reset_index()
+        df_resumen['% Score'] = (df_resumen['Obtenido'] / df_resumen['Maximo']) * 100
+        st.dataframe(df_resumen[['fecha_registro', 'area', 'Obtenido', '% Score', 'observaciones']], use_container_width=True, hide_index=True)
