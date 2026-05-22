@@ -7,7 +7,7 @@ import os
 import shutil
 
 # Configuración de la página
-st.set_page_config(page_title="QualityScore Enterprise Edition", layout="wide")
+st.set_page_config(page_title="Centro de Control y Mejora", layout="wide")
 
 # --- 🗄️ LOGICA DE BASE DE DATOS PARA NUBE ---
 DB_ORIGINAL = 'calidad.db'
@@ -55,7 +55,7 @@ if "autenticado" not in st.session_state:
 
 # --- 🚪 LOGIN ---
 if not st.session_state["autenticado"]:
-    st.subheader("🔑 QualityScore Enterprise - Login")
+    st.subheader("🔑 Quality Assurance - Login")
     u_log = st.text_input("Usuario")
     p_log = st.text_input("Contraseña", type="password")
     if st.button("Ingresar"):
@@ -75,7 +75,7 @@ if not st.session_state["autenticado"]:
 
 # --- 🔓 APP PRINCIPAL ---
 user_data = st.session_state["user_data"]
-st.sidebar.title("🚀 QualityScore")
+st.sidebar.title("🚀 QualityAssurance")
 st.sidebar.write(f"Usuario: **{user_data['user']}**")
 
 if st.sidebar.button("🚪 Cerrar Sesión"):
@@ -93,7 +93,7 @@ choice = st.sidebar.selectbox("Menú", menu)
 
 # --- 📊 DASHBOARD ---
 if choice == "Dashboard":
-    st.header("📊 Analítica de Calidad")
+    st.header("📊 Dashboard Evaluaciones")
     conn = get_connection()
     df_eval = pd.read_sql_query("SELECT * FROM evaluaciones", conn)
     
@@ -132,7 +132,7 @@ if choice == "Dashboard":
             ).reset_index()
             df_cons['% Final'] = (df_cons['Suma_Obtenida'] / df_cons['Suma_Maxima']) * 100
 
-            st.metric("Total de Monitoreos Realizados", len(df_cons))
+            st.metric("Monitoreos realizados", len(df_cons))
 
             if sel_camp == "Ver Todas":
                 fig1 = px.bar(df_cons.groupby('area')['% Final'].mean().reset_index(), 
