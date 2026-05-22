@@ -4,16 +4,26 @@ import sqlite3
 import plotly.express as px
 from datetime import datetime
 import os
+import shutil
 
 # Configuración de la página
 st.set_page_config(page_title="QualityScore Enterprise Edition", layout="wide")
 
-# --- 🗄️ CONEXIÓN ESTABLE ---
-# Determinamos la ruta de la base de datos
-DB_PATH = 'calidad.db'
+# --- 🗄️ AJUSTE PARA NUBE (Persistencia Temporal) ---
+# En la nube, copiamos la DB a /tmp para poder escribir en ella
+DB_ORIGINAL = 'calidad.db'
+DB_NUBE = '/tmp/calidad.db'
+
+if not os.path.exists(DB_NUBE):
+    if os.path.exists(DB_ORIGINAL):
+        shutil.copy2(DB_ORIGINAL, DB_NUBE)
+    else:
+        # Si no existe, se creará vacía en /tmp
+        pass
 
 def get_connection():
-    return sqlite3.connect(DB_PATH, check_same_thread=False)
+    # Siempre conectamos a la versión de /tmp que permite escritura
+    return sqlite3.connect(DB_NUBE, check_same_thread=False)
 
 def init_db():
     conn = get_connection()
@@ -29,6 +39,7 @@ def init_db():
     c.execute('''CREATE TABLE IF NOT EXISTS usuarios 
                  (id INTEGER PRIMARY KEY, username TEXT UNIQUE, password TEXT, rol TEXT, campaña TEXT, estado TEXT DEFAULT 'Activo')''')
     
+    # Migración rápida
     try:
         c.execute("ALTER TABLE evaluaciones ADD COLUMN tipo_evaluador TEXT DEFAULT 'Calidad'")
     except:
@@ -42,6 +53,7 @@ def init_db():
     conn.close()
 
 init_db()
+
 
 # --- 🔑 LÓGICA DE SESIÓN ---
 if "autenticado" not in st.session_state:
