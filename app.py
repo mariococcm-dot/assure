@@ -55,7 +55,7 @@ if "autenticado" not in st.session_state:
 
 # --- 🚪 LOGIN ---
 if not st.session_state["autenticado"]:
-    st.subheader("🔑 Quality Assurance - Login")
+    st.subheader("🔑 Call Center de México | Quality Assurance")
     u_log = st.text_input("Usuario")
     p_log = st.text_input("Contraseña", type="password")
     if st.button("Ingresar"):
