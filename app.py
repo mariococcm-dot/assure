@@ -75,7 +75,7 @@ if not st.session_state["autenticado"]:
 
 # --- 🔓 APP PRINCIPAL ---
 user_data = st.session_state["user_data"]
-st.sidebar.title("🤖 CCM - QualityAssurance")
+st.sidebar.title("🎓 CCM - QualityAssurance")
 st.sidebar.write(f"Usuario: **{user_data['user']}**")
 
 if st.sidebar.button("🚪 Cerrar Sesión"):
