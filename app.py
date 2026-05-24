@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import requests # Necesitas añadir esta importación al inicio de tu app.py
 from datetime import datetime
 
 # --- 1. CONFIGURACIÓN ---
@@ -68,28 +69,36 @@ if choice == "Gestión Usuarios":
     with col2:
         st.dataframe(df_u[['username', 'rol', 'campaña', 'estado']] if not df_u.empty else pd.DataFrame())
 
-# --- MÓDULO: GESTIÓN CAMPAÑAS (BLOQUE DE ESCRITURA CORREGIDO) ---
+# --- MÓDULO: GESTIÓN CAMPAÑAS (CON ESCRITURA REAL) ---
 elif choice == "Gestión Campañas":
     st.header("📁 Administración de Campañas")
     df_c = get_data()
     
+    # URL del Apps Script que generaste en el Paso 1
+    # Puedes guardarla también en st.secrets["url_script"]
+    URL_SCRIPT = "https://script.google.com/macros/s/AKfycbyEdbIgptnq0RMKBoOulsQA6FyCjCtJWzOYHxamNjFMbBybQKAvolPaOzR7Hcj9ta5w/exec" 
+
     col1, col2 = st.columns([1, 2])
     with col1:
         st.subheader("Acciones")
         modo = st.radio("Operación:", ["Nueva", "Editar Existente"])
         
         if modo == "Nueva":
-            nc = st.text_input("Nombre Campaña")
-            if st.button("Guardar Nueva"):
+            nc = st.text_input("Nombre de la Nueva Campaña")
+            if st.button("🚀 Guardar en Google Sheets"):
                 if nc:
-                    # Aquí es donde se debe agregar la lógica de guardado real
-                    # Por ahora, simulamos la actualización del dataframe local
-                    st.success(f"✅ Campaña '{nc}' enviada a la base de datos.")
-                    # NOTA: Para que impacte en el Excel, necesitas configurar 
-                    # una función de 'append' hacia tu URL de Google Sheets.
+                    # Enviar el dato al script para que lo escriba en el Excel [cite: 71, 72]
+                    try:
+                        response = requests.post(URL_SCRIPT, json={"nombre": nc})
+                        if response.status_code == 200:
+                            st.success(f"✅ ¡Campaña '{nc}' creada exitosamente!")
+                            st.rerun() # Recarga para ver el cambio 
+                        else:
+                            st.error("Error al conectar con el script.")
+                    except Exception as e:
+                        st.error(f"Error de red: {e}")
                 else:
-                    st.error("Escribe un nombre válido.")
-
+                    st.error("El nombre no puede estar vacío.")
     with col2:
         st.subheader("Listado y Control")
         if not df_c.empty:
