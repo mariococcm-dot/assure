@@ -18,8 +18,8 @@ def get_data(gid):
 # Usuarios suele ser 0, Scorecards y Evaluaciones tienen números largos.
 GIDS = {
     "usuarios": "0", 
-    "scorecards": "TU_GID_AQUI", 
-    "evaluaciones": "TU_GID_AQUI"
+    "scorecards": "573669628", 
+    "evaluaciones": "1167919088"
 }
 
 # --- ESTILO ---
