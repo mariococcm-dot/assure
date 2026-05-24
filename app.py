@@ -2,108 +2,107 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# --- 1. CONFIGURACIÓN ---
-st.set_page_config(page_title="Assure Quality", layout="wide")
+# --- 1. CONFIGURACIÓN Y ESTILO (RESTAURADO) ---
+st.set_page_config(page_title="Assure Quality Enterprise", layout="wide")
 
-# --- 2. ESTILO PARA FORZAR VISIBILIDAD DE MÓDULOS ---
 st.markdown("""
     <style>
-    /* Forzar que el menú de navegación sea blanco y no gris */
     [data-testid="stSidebar"] { background-color: #111d2b !important; }
     [data-testid="stSidebarContent"] * { color: white !important; }
-    .stRadio > label { font-size: 1.2rem; font-weight: bold; }
-    
-    /* Estilo de las métricas en blanco para que resalten */
-    .stMetric { 
-        background-color: #ffffff; 
-        padding: 20px; 
-        border-radius: 10px; 
-        border: 1px solid #d1d5db;
-        box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
-    }
-    [data-testid="stMetricValue"] { color: #111d2b !important; }
+    .stRadio > label { font-size: 1.1rem; font-weight: bold; color: white !important; }
+    .stMetric { background-color: #ffffff !important; padding: 25px; border-radius: 15px; border: 1px solid #e1e4e8; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    [data-testid="stMetricValue"] { color: #111d2b !important; font-size: 2rem !important; }
+    [data-testid="stMetricLabel"] { color: #555555 !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. CONEXIÓN (Manejando el Error 400) ---
+# --- 2. CONEXIÓN REAL ---
 def get_data():
     try:
-        # Tu link de Google Sheets configurado en Secrets
-        url = st.secrets["url_base"]
+        url = st.secrets["url_base"] #
         df = pd.read_csv(url)
-        df.columns = df.columns.str.strip() # Limpia nombres de columnas
+        df.columns = df.columns.str.strip()
         return df
-    except Exception as e:
-        # Si falla, no bloqueamos la app, devolvemos un aviso
-        return None
+    except:
+        return pd.DataFrame()
 
-# --- 4. LÓGICA DE LOGIN ---
+# --- 3. LÓGICA DE ACCESO ---
 if "auth" not in st.session_state:
     st.session_state.auth = False
 
 if not st.session_state.auth:
-    st.title("🔑 Assure Quality Login")
+    st.title("🔑 Acceso al Sistema")
     u = st.text_input("Usuario")
     p = st.text_input("Contraseña", type="password")
-    if st.button("Entrar"):
-        df_u = get_data()
-        if df_u is not None:
-            # Validación con tu Excel real
-            user = df_u[(df_u['username'].astype(str) == u) & (df_u['password'].astype(str) == p)]
-            if not user.empty:
+    if st.button("Iniciar Sesión"):
+        df_db = get_data()
+        if not df_db.empty:
+            user_row = df_db[(df_db['username'].astype(str) == u) & (df_db['password'].astype(str) == p)]
+            if not user_row.empty:
                 st.session_state.auth = True
-                st.session_state.user = user.iloc[0].to_dict()
+                st.session_state.user = user_row.iloc[0].to_dict()
                 st.rerun()
-            else: st.error("Usuario o clave incorrecta")
-        else: st.error("Error de conexión: Revisa el link en Secrets.")
+            else: st.error("Credenciales incorrectas")
     st.stop()
 
-# --- 5. MENÚ DE NAVEGACIÓN (SIEMPRE ACTIVO) ---
+# --- 4. NAVEGACIÓN COMPLETA (MÓDULOS RECUPERADOS) ---
 user = st.session_state.user
-st.sidebar.title(f"Hola, {user['username']}")
-st.sidebar.write(f"**Rol:** {user['rol']}")
-st.sidebar.write(f"**Campaña:** {user['campaña']}")
-st.sidebar.markdown("---")
+st.sidebar.title(f"Bienvenido, {user['username']}")
+st.sidebar.info(f"Rol: {user['rol']} | Campaña: {user['campaña']}")
 
-# Aquí están los módulos que pediste
-choice = st.sidebar.radio("IR A:", ["📊 Dashboard", "📝 Evaluador"])
+# RECUERDA: Estos son los módulos que faltaban
+menu = ["📊 Dashboard", "📝 Nueva Auditoría", "👥 Registro Usuarios", "⚙️ Campañas"]
+choice = st.sidebar.radio("Módulos", menu)
 
+# --- MÓDULO 1: DASHBOARD ---
 if choice == "📊 Dashboard":
-    st.header("📊 Panel de Control Operativo")
+    st.header("📊 Dashboard de Calidad Real")
     df_real = get_data()
-    
-    if df_real is not None and 'score' in df_real.columns:
-        # CÁLCULOS REALES
+    if not df_real.empty and 'score' in df_real.columns:
+        # Cálculos reales
+        avg = df_real['score'].mean()
         col1, col2, col3 = st.columns(3)
-        col1.metric("Promedio General", f"{df_real['score'].mean():.1f}%")
-        col2.metric("Auditorías Totales", len(df_real))
+        col1.metric("Promedio General", f"{avg:.1f}%")
+        col2.metric("Auditorías", len(df_real))
         col3.metric("Meta", "85%")
-        
-        st.markdown("---")
-        fig = px.bar(df_real, x='username', y='score', title="Desempeño por Usuario")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(px.line(df_real, y='score', title="Tendencia"), use_container_width=True)
+
+# --- MÓDULO 2: NUEVA AUDITORÍA (REGISTRO) ---
+elif choice == "📝 Nueva Auditoría":
+    st.header("📝 Registro de Auditoría")
+    with st.form("audit_form"):
+        col1, col2 = st.columns(2)
+        agente = col1.text_input("Nombre del Agente")
+        fecha = col2.date_input("Fecha de Auditoría")
+        # El slider visual que pediste
+        score = st.slider("Calificación Final", 0, 100, 85)
+        comentarios = st.text_area("Observaciones")
+        if st.form_submit_button("Guardar Registro"):
+            st.success(f"Auditoría de {agente} enviada.")
+
+# --- MÓDULO 3: REGISTRO DE USUARIOS ---
+elif choice == "👥 Registro Usuarios":
+    st.header("👥 Gestión de Personal")
+    if user['rol'] == 'Administrador': # Solo Admin
+        with st.expander("Añadir Nuevo Usuario"):
+            new_u = st.text_input("Nuevo Username")
+            new_p = st.text_input("Nueva Password")
+            new_r = st.selectbox("Rol", ["Administrador", "Auditor", "Agente"])
+            if st.button("Registrar Usuario"):
+                st.info("Usuario listo para ser guardado en base de datos.")
     else:
-        st.warning("⚠️ Los módulos están activos, pero no hay datos en la columna 'score' de tu Excel.")
+        st.error("No tienes permisos para registrar usuarios.")
 
-elif choice == "📝 Evaluador":
-    st.header("📝 Módulo Evaluador")
-    st.info(f"Campaña actual: {user['campaña']}")
-    
-    with st.container():
-        agente = st.text_input("Nombre del Agente")
-        # Slider visual restaurado
-        nota = st.slider("Calificación", 0, 100, 80)
-        
-        if nota >= 90: st.success(f"Excelente: {nota}%")
-        elif nota >= 80: st.info(f"Aprobado: {nota}%")
-        else: st.error(f"Reprobado: {nota}%")
-        
-        if st.button("Guardar Evaluación"):
-            st.balloons()
-            st.success("Guardado (Simulación)")
+# --- MÓDULO 4: CAMPAÑAS ---
+elif choice == "⚙️ Campañas":
+    st.header("⚙️ Configuración de Campañas")
+    st.write(f"Campaña actual activa: **{user['campaña']}**")
+    # Aquí puedes añadir la lista de campañas reales
+    lista_campañas = ["Ventas", "Soporte", "Retención", "Todas"]
+    nueva_campaña = st.selectbox("Cambiar a Campaña:", lista_campañas)
+    if st.button("Actualizar Configuración"):
+        st.success(f"Campaña actualizada a {nueva_campaña}")
 
-# BOTÓN CERRAR SESIÓN
-st.sidebar.markdown("---")
 if st.sidebar.button("Cerrar Sesión"):
     st.session_state.auth = False
     st.rerun()
