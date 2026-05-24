@@ -146,7 +146,7 @@ if choice == "Dashboard":
                 st.plotly_chart(fig_a, use_container_width=True)
     conn.close()
 
-# --- 📝 EVALUADOR (RESTORED WITH FEEDBACK) ---
+# --- 📝 EVALUADOR ---
 elif choice == "Evaluador":
     st.header("📝 Evaluación de Calidad")
     conn = get_connection()
@@ -169,8 +169,6 @@ elif choice == "Evaluador":
         c.execute("SELECT id, pregunta, puntos, tipo FROM scorecards WHERE area=?", (a_sel,))
         pregs = c.fetchall()
         resps = {}
-        
-        st.markdown("---")
         for idp, txt, pts, t in pregs:
             if t == "Sí / No":
                 r = st.radio(txt, ["Sí", "No"], key=idp)
@@ -179,25 +177,14 @@ elif choice == "Evaluador":
                 r = st.slider(txt, 0, pts, pts, key=idp)
                 resps[idp] = {"o": r, "m": pts, "t": txt}
         
-        st.markdown("---")
-        obs = st.text_area("Observaciones y Feedback")
-        
-        # Lógica de Score y Feedback Visual
+        obs = st.text_area("Observaciones")
         s_o = sum(x["o"] for x in resps.values())
         s_m = sum(x["m"] for x in resps.values())
         pct = (s_o/s_m*100) if s_m>0 else 0
         
-        st.markdown("### 🎯 Resultado de la Evaluación")
-        
-        # Indicadores de estado restaurados
-        if pct >= 90:
-            st.metric("Score Final", f"{pct:.1f}%", delta="🎯 Excelente", delta_color="normal")
-        elif pct >= 80:
-            st.metric("Score Final", f"{pct:.1f}%", delta="✔️ Aprobado", delta_color="off")
-        else:
-            st.metric("Score Final", f"{pct:.1f}%", delta="🚨 Requiere Mejora", delta_color="inverse")
+        st.metric("Score Previsualizado", f"{pct:.1f}%")
 
-        if st.button("💾 Guardar Evaluación"):
+        if st.button("Guardar Evaluación"):
             f_r = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             for idp, v in resps.items():
                 c.execute('''INSERT INTO evaluaciones 
@@ -206,7 +193,7 @@ elif choice == "Evaluador":
                              VALUES (?,?,?,?,?,?,?,?,?,?)''',
                           (f_r, str(f_ev), a_sel, user_data['user'], ag_sel, v['t'], v['o'], v['m'], obs, t_eval))
             conn.commit()
-            st.success(f"✅ Evaluación guardada exitosamente con un puntaje de {pct:.1f}%")
+            st.success("Guardado correctamente.")
     conn.close()
 
 # --- ⚙️ CONFIG SCORECARDS ---
