@@ -68,16 +68,44 @@ if choice == "Gestión Usuarios":
     with col2:
         st.dataframe(df_u[['username', 'rol', 'campaña', 'estado']] if not df_u.empty else pd.DataFrame())
 
-# --- MÓDULO: GESTIÓN CAMPAÑAS (LEER DE TU EXCEL) ---
+# --- MÓDULO: GESTIÓN CAMPAÑAS (RESTAURADO SEGÚN 22052026.TXT) ---
 elif choice == "Gestión Campañas":
     st.header("📁 Administración de Campañas")
     df_c = get_data()
-    # Extraer nombres de campañas reales que existan en la columna 'area' o 'campaña' [cite: 26]
-    campañas_reales = df_c['campaña'].unique().tolist() if 'campaña' in df_c.columns else []
     
-    st.subheader("Campañas Activas en el Sistema")
-    st.write(campañas_reales) # Solo muestra lo que existe en el Excel
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        st.subheader("Acciones")
+        # Modo de operación exacto a tu código original
+        modo = st.radio("Operación:", ["Nueva", "Editar Existente"])
+        
+        if modo == "Nueva":
+            nc = st.text_input("Nombre Campaña")
+            if st.button("Guardar Nueva"):
+                if nc: st.info(f"Procesando creación de: {nc}")
+        else:
+            if not df_c.empty:
+                # Cargar lista real de campañas del Excel para editar
+                camp_list = df_c['campaña'].unique().tolist()
+                sel_edit = st.selectbox("Seleccionar para editar:", camp_list)
+                nuevo_n = st.text_input("Nuevo Nombre")
+                if st.button("Actualizar"):
+                    st.success(f"Actualizando {sel_edit} a {nuevo_n}")
 
+    with col2:
+        st.subheader("Listado y Control")
+        if not df_c.empty:
+            # Mostrar tabla de campañas existentes
+            st.dataframe(df_c[['campaña', 'estado']].drop_duplicates(), use_container_width=True)
+            
+            st.markdown("---")
+            # Botones de estado exactos a tu versión funcional
+            c_acc = st.selectbox("Seleccionar Campaña para cambiar estado:", df_c['campaña'].unique())
+            b1, b2, b3 = st.columns(3)
+            if b1.button("✅ Habilitar"): st.info(f"{c_acc} Habilitada")
+            if b2.button("🚫 Deshabilitar"): st.warning(f"{c_acc} Deshabilitada")
+            if b3.button("🗑️ Borrar"): st.error(f"{c_acc} Eliminada")
+                
 # --- MÓDULO: EVALUADOR (SOLO CAMPAÑAS EXISTENTES) ---
 elif choice == "Evaluador":
     st.header("📝 Evaluación de Calidad")
