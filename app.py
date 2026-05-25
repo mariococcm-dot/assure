@@ -10,7 +10,7 @@ st.set_page_config(page_title="QualityScore Enterprise", layout="wide")
 # --- 2. CONEXIÓN EXCLUSIVA A TU GOOGLE SHEET ---
 def get_data():
     try:
-        url = st.secrets["url_base"] # Usa tu URL real de st.secrets
+        url = st.secrets["https://docs.google.com/spreadsheets/d/145J2pcrSh3Zki5U5ThbqHA62zeybyHTF-GJogMEbIco/export?format=csv&gid=0"] # Usa tu URL real de st.secrets
         df = pd.read_csv(url)
         df.columns = df.columns.str.strip()
         return df
