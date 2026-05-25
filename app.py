@@ -1,23 +1,27 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import requests # Necesitas añadir esta importación al inicio de tu app.py
+import requests
 from datetime import datetime
 
 # --- 1. CONFIGURACIÓN ---
 st.set_page_config(page_title="QualityScore Enterprise", layout="wide")
 
-# --- 2. CONEXIÓN EXCLUSIVA A TU GOOGLE SHEET ---
+# URL DE CONEXIÓN (Ajusta esta URL con tu implementación de Apps Script)
+URL_SCRIPT = "https://script.google.com/macros/s/AKfycbwOzQXYSGb1aFciCb28ivzWtV9PjhITXKpacPTzpszvEoCFFcxlr5AUgn1V-g1lHyuJ/exec"
+
+# --- 2. CONEXIÓN A GOOGLE SHEET ---
 def get_data():
     try:
-        url = st.secrets["https://docs.google.com/spreadsheets/d/145J2pcrSh3Zki5U5ThbqHA62zeybyHTF-GJogMEbIco/export?format=csv&gid=0"] # Usa tu URL real de st.secrets
+        # Se usa la clave 'url_base' definida en tus Secrets [cite: 108]
+        url = st.secrets["url_base"]
         df = pd.read_csv(url)
         df.columns = df.columns.str.strip()
         return df
     except Exception:
         return pd.DataFrame()
 
-# --- 3. LÓGICA DE SESIÓN (ARCHIVO 22052026.txt) ---
+# --- 3. LÓGICA DE SESIÓN ---
 if "autenticado" not in st.session_state:
     st.session_state["autenticado"] = False
 
@@ -28,7 +32,6 @@ if not st.session_state["autenticado"]:
     if st.button("Ingresar"):
         df_db = get_data()
         if not df_db.empty:
-            # Validación real contra tu tabla [cite: 5]
             user_row = df_db[(df_db['username'].astype(str) == u_log) & (df_db['password'].astype(str) == p_log)]
             if not user_row.empty:
                 user = user_row.iloc[0]
@@ -37,14 +40,13 @@ if not st.session_state["autenticado"]:
                 st.rerun()
     st.stop()
 
-# --- 4. MENÚ Y NAVEGACIÓN (ORIGINAL) ---
+# --- 4. MENÚ ---
 user_data = st.session_state["user_data"]
 st.sidebar.title("🚀 QualityScore")
 st.sidebar.write(f"Usuario: **{user_data['user']}**")
 
-# Roles y Menú según tu archivo original [cite: 6]
 if user_data['rol'] == 'Administrador':
-    menu = ["Dashboard", "Evaluador", "Config Scorecards", "Gestión Campañas", "Gestión Usuarios"]
+    menu = ["Dashboard", "Evaluador", "Gestión Campañas", "Gestión Usuarios"]
 elif user_data['rol'] == 'Evaluador':
     menu = ["Dashboard", "Evaluador"]
 else:
@@ -52,92 +54,39 @@ else:
 
 choice = st.sidebar.selectbox("Menú", menu)
 
-# --- MÓDULO: GESTIÓN USUARIOS (CONEXIÓN A PESTAÑA USUARIOS) ---
-elif choice == "Gestión Usuarios":
-    st.header("👥 Gestión de Personal")
-    df_u = get_data()
-    
-    col_u1, col_u2 = st.columns([1, 2])
-    with col_u1:
-        st.subheader("Acciones")
-        modo_u = st.radio("Operación:", ["Nuevo", "Editar"])
-        
-        if modo_u == "Nuevo":
-            nu = st.text_input("Username")
-            np = st.text_input("Password", type="password")
-            nr = st.selectbox("Rol", ["Administrador", "Evaluador", "Agente"])
-            camps_u = df_u['campaña'].unique().tolist() if not df_u.empty else ["Todas"]
-            nc_u = st.selectbox("Campaña", camps_u)
-            
-            if st.button("🚀 Registrar Usuario"):
-                payload = {
-                    "target_sheet": "usuarios", # Destino correcto
-                    "username": nu,
-                    "password": np,
-                    "rol": nr,
-                    "campaña": nc_u
-                }
-                res = requests.post(URL_SCRIPT, json=payload)
-                if res.text == "Éxito":
-                    st.success("Usuario registrado")
-                    st.rerun()
-        else:
-            st.info("Selecciona un usuario de la lista para editar (Lógica de edición pendiente)")
+# --- MÓDULOS DE NAVEGACIÓN (Sintaxis Corregida) ---
 
-    with col_u2:
-        st.subheader("Lista de Usuarios Actual")
-        if not df_u.empty:
-            # Solo mostrar columnas existentes en la pestaña 'usuarios'
-            st.dataframe(df_u[['username', 'rol', 'campaña', 'estado']], use_container_width=True)
-            
-# URL de tu nueva implementación de Apps Script
-URL_SCRIPT = "https://script.google.com/macros/s/AKfycbwk5v7mPhLnfRuNCs5K6HCnXbggpbBVlrFktOb4F5vWwAL5Na5j2_3JFGh0Dde7Tk4q/exec"
+if choice == "Dashboard":
+    st.header("📊 Analítica de Calidad")
+    df_dash = get_data()
+    if not df_dash.empty:
+        camps_dash = ["Ver Todas"] + df_dash['campaña'].unique().tolist()
+        sel_camp = st.selectbox("Filtrar por Campaña:", camps_dash)
+        st.info(f"Mostrando datos reales para: {sel_camp}")
 
-# --- BLOQUE: GESTIÓN CAMPAÑAS ---
-if choice == "Gestión Campañas":
-    # ... (resto del código de interfaz)
-    if st.button("🚀 Guardar Nueva"):
-        if nc:
-            # Enviamos el nombre de la hoja 'campañas' (créala en tu Excel)
-            payload = {"target_sheet": "campañas", "nombre": nc}
-            res = requests.post(URL_SCRIPT, json=payload)
-            if res.text == "Éxito":
-                st.success("Campaña guardada")
-                st.rerun()
-            else:
-                st.error(f"Error: {res.text}")     
-
-# --- MÓDULO: EVALUADOR (CONEXIÓN A PESTAÑA EVALUACIONES) ---
-if choice == "Evaluador":
+elif choice == "Evaluador":
     st.header("📝 Evaluación de Calidad")
     df_base = get_data()
-    URL_SCRIPT = st.secrets["url_script"] # Asegúrate de tener esto en tus Secrets
-
     camps_reales = df_base['campaña'].unique().tolist() if not df_base.empty else []
     
     if not camps_reales:
-        st.warning("No hay campañas configuradas en la base de datos.")
+        st.warning("No hay campañas configuradas.")
     else:
         with st.form("form_eval"):
             c1, c2 = st.columns(2)
             a_sel = c1.selectbox("Campaña", camps_reales)
-            
-            # Filtro de agentes basado en el archivo original
             ags = df_base[(df_base['rol'] == 'Agente') & (df_base['campaña'] == a_sel)]['username'].tolist()
             ag_sel = c2.selectbox("Agente", ags) if ags else c2.text_input("Nombre Agente (Manual)")
             
             f_ev = st.date_input("Fecha de Evento", datetime.now())
             t_eval = st.selectbox("Evaluado por:", ["Calidad", "Operaciones"])
-            
-            st.markdown("---")
-            score_val = st.slider("Calidad de Proceso / Criterio Único", 0, 100, 85)
+            score_val = st.slider("Calidad de Proceso (%)", 0, 100, 85)
             obs = st.text_area("Observaciones")
             
             if st.form_submit_button("Guardar Evaluación"):
-                f_r = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 payload = {
-                    "target_sheet": "evaluaciones", # Destino correcto
-                    "fecha_registro": f_r,
+                    "target_sheet": "evaluaciones", # Asegúrate que la pestaña exista
+                    "fecha_registro": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "fecha_evento": str(f_ev),
                     "area": a_sel,
                     "evaluador": user_data['user'],
@@ -150,20 +99,36 @@ if choice == "Evaluador":
                 }
                 res = requests.post(URL_SCRIPT, json=payload)
                 if res.text == "Éxito":
-                    st.success(f"✅ Guardado: {ag_sel} - {score_val}%")
+                    st.success("✅ Evaluación guardada")
                     st.balloons()
                 else:
                     st.error(f"Error: {res.text}")
 
-# --- MÓDULO: DASHBOARD ---
-elif choice == "Dashboard":
-    st.header("📊 Analítica de Calidad")
-    df_dash = get_data()
-    if not df_dash.empty:
-        # Filtro dinámico basado en los datos [cite: 9]
-        camps_dash = ["Ver Todas"] + df_dash['campaña'].unique().tolist()
-        sel_camp = st.selectbox("Filtrar por Campaña:", camps_dash)
-        st.info(f"Mostrando datos reales para: {sel_camp}")
+elif choice == "Gestión Campañas":
+    st.header("📁 Administración de Campañas")
+    nc = st.text_input("Nombre de la Nueva Campaña")
+    if st.button("🚀 Guardar Nueva"):
+        if nc:
+            payload = {"target_sheet": "campañas", "nombre": nc} # Requiere pestaña 'campañas' [cite: 117]
+            res = requests.post(URL_SCRIPT, json=payload)
+            if res.text == "Éxito":
+                st.success("Campaña guardada")
+                st.rerun()
+
+elif choice == "Gestión Usuarios":
+    st.header("👥 Gestión de Personal")
+    df_u = get_data()
+    with st.form("nuevo_usuario"):
+        nu = st.text_input("Username")
+        np = st.text_input("Password", type="password")
+        nr = st.selectbox("Rol", ["Administrador", "Evaluador", "Agente"])
+        nc_u = st.selectbox("Campaña", df_u['campaña'].unique().tolist() if not df_u.empty else ["Todas"])
+        if st.form_submit_button("Registrar Usuario"):
+            payload = {"target_sheet": "usuarios", "username": nu, "password": np, "rol": nr, "campaña": nc_u}
+            res = requests.post(URL_SCRIPT, json=payload)
+            if res.text == "Éxito":
+                st.success("Usuario registrado")
+                st.rerun()
 
 if st.sidebar.button("🚪 Cerrar Sesión"):
     st.session_state["autenticado"] = False
