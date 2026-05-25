@@ -52,66 +52,39 @@ else:
 
 choice = st.sidebar.selectbox("Menú", menu)
 
-# --- MÓDULO: GESTIÓN USUARIOS (LEER DE TU EXCEL) ---
-if choice == "Gestión Usuarios":
-    st.header("👥 Gestión de Personal")
-    df_u = get_data() # Obtener usuarios reales
-    
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        modo = st.radio("Operación:", ["Nuevo", "Editar"])
-        if modo == "Nuevo":
-            st.text_input("Username")
-            # Lista de campañas dinámica desde el Excel, no manual [cite: 34]
-            camps_avail = df_u['campaña'].unique().tolist() if not df_u.empty else []
-            st.selectbox("Campaña", ["Todas"] + camps_avail)
-            st.button("🚀 Registrar")
-    with col2:
-        st.dataframe(df_u[['username', 'rol', 'campaña', 'estado']] if not df_u.empty else pd.DataFrame())
-
-# --- MÓDULO: GESTIÓN CAMPAÑAS (CON ESCRITURA REAL) ---
-elif choice == "Gestión Campañas":
-    st.header("📁 Administración de Campañas")
-    df_c = get_data()
-    
-    # URL del Apps Script que generaste en el Paso 1
-    # Puedes guardarla también en st.secrets["url_script"]
-    URL_SCRIPT = "https://script.google.com/macros/s/AKfycbyEdbIgptnq0RMKBoOulsQA6FyCjCtJWzOYHxamNjFMbBybQKAvolPaOzR7Hcj9ta5w/exec" 
-
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        st.subheader("Acciones")
-        modo = st.radio("Operación:", ["Nueva", "Editar Existente"])
-        
-        if modo == "Nueva":
-            nc = st.text_input("Nombre de la Nueva Campaña")
-            if st.button("🚀 Guardar en Google Sheets"):
-                if nc:
-                    # Enviar el dato al script para que lo escriba en el Excel [cite: 71, 72]
-                    try:
-                        response = requests.post(URL_SCRIPT, json={"nombre": nc})
-                        if response.status_code == 200:
-                            st.success(f"✅ ¡Campaña '{nc}' creada exitosamente!")
-                            st.rerun() # Recarga para ver el cambio 
-                        else:
-                            st.error("Error al conectar con el script.")
-                    except Exception as e:
-                        st.error(f"Error de red: {e}")
-                else:
-                    st.error("El nombre no puede estar vacío.")
-    with col2:
-        st.subheader("Listado y Control")
-        if not df_c.empty:
-            # Mostrar tabla de campañas existentes
-            st.dataframe(df_c[['campaña', 'estado']].drop_duplicates(), use_container_width=True)
+# --- BLOQUE: GESTIÓN USUARIOS ---
+elif choice == "Gestión Usuarios":
+    # ... (interfaz de nuevo usuario) [cite: 78]
+    if st.button("🚀 Registrar"):
+        # Enviamos a la hoja 'usuarios' que sí existe
+        payload = {
+            "target_sheet": "usuarios",
+            "username": nu,
+            "password": np,
+            "rol": nr,
+            "campaña": nc_u
+        }
+        res = requests.post(URL_SCRIPT, json=payload)
+        if res.text == "Éxito":
+            st.success("Usuario registrado")
+            st.rerun()
             
-            st.markdown("---")
-            # Botones de estado exactos a tu versión funcional
-            c_acc = st.selectbox("Seleccionar Campaña para cambiar estado:", df_c['campaña'].unique())
-            b1, b2, b3 = st.columns(3)
-            if b1.button("✅ Habilitar"): st.info(f"{c_acc} Habilitada")
-            if b2.button("🚫 Deshabilitar"): st.warning(f"{c_acc} Deshabilitada")
-            if b3.button("🗑️ Borrar"): st.error(f"{c_acc} Eliminada")
+# URL de tu nueva implementación de Apps Script
+URL_SCRIPT = "https://script.google.com/macros/s/AKfycbwk5v7mPhLnfRuNCs5K6HCnXbggpbBVlrFktOb4F5vWwAL5Na5j2_3JFGh0Dde7Tk4q/exec"
+
+# --- BLOQUE: GESTIÓN CAMPAÑAS ---
+if choice == "Gestión Campañas":
+    # ... (resto del código de interfaz)
+    if st.button("🚀 Guardar Nueva"):
+        if nc:
+            # Enviamos el nombre de la hoja 'campañas' (créala en tu Excel)
+            payload = {"target_sheet": "campañas", "nombre": nc}
+            res = requests.post(URL_SCRIPT, json=payload)
+            if res.text == "Éxito":
+                st.success("Campaña guardada")
+                st.rerun()
+            else:
+                st.error(f"Error: {res.text}")     
                 
 # --- MÓDULO: EVALUADOR (SOLO CAMPAÑAS EXISTENTES) ---
 elif choice == "Evaluador":
