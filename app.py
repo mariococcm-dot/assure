@@ -89,17 +89,58 @@ if choice == "Gestión Campañas":
 # --- MÓDULO: EVALUADOR (SOLO CAMPAÑAS EXISTENTES) ---
 elif choice == "Evaluador":
     st.header("📝 Evaluación de Calidad")
-    df_eval = get_data()
-    # CORRECCIÓN: Tomar campañas solo del Excel [cite: 17]
-    camps_reales = df_eval['campaña'].unique().tolist() if not df_eval.empty else []
+    df_base = get_data() # Leemos datos actuales para obtener campañas y agentes reales
+    
+    # URL de tu Apps Script (Paso 1)
+    URL_SCRIPT = "https://script.google.com/macros/s/AKfycbwOzQXYSGb1aFciCb28ivzWtV9PjhITXKpacPTzpszvEoCFFcxlr5AUgn1V-g1lHyuJ/exec"
+
+    # Filtros dinámicos basados en tu archivo original
+    camps_reales = df_base['campaña'].unique().tolist() if not df_base.empty else []
     
     if not camps_reales:
-        st.warning("No hay campañas registradas en el Excel.")
+        st.warning("No hay campañas configuradas.")
     else:
-        # Aquí ya no aparecerá "Ventas" o "Soporte" a menos que estén en tu archivo
-        a_sel = st.selectbox("Seleccionar Campaña Real", camps_reales)
-        st.text_input("Nombre del Agente")
-        st.button("Guardar Evaluación")
+        c1, c2, c3, c4 = st.columns(4)
+        with c1: a_sel = st.selectbox("Campaña", camps_reales)
+        with c2:
+            # Filtramos agentes de esa campaña específica
+            ags = df_base[(df_base['rol'] == 'Agente') & (df_base['campaña'] == a_sel)]['username'].tolist()
+            ag_sel = st.selectbox("Agente", ags) if ags else st.text_input("Nombre Agente (Manual)")
+        with c3: f_ev = st.date_input("Fecha de Evento", datetime.now())
+        with c4: t_eval = st.selectbox("Evaluado por:", ["Calidad", "Operaciones"])
+
+        # Sección de preguntas (Basado en tu slider original)
+        st.markdown("---")
+        score_val = st.slider("Calidad de Proceso / Criterio Único", 0, 100, 85)
+        obs = st.text_area("Observaciones")
+
+        if st.button("Guardar Evaluación"):
+            f_r = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            
+            # Preparamos el paquete de datos para la pestaña 'evaluaciones'
+            payload = {
+                "target_sheet": "evaluaciones",
+                "fecha_registro": f_r,
+                "fecha_evento": str(f_ev),
+                "area": a_sel,
+                "evaluador": user_data['user'],
+                "agente": ag_sel,
+                "pregunta": "Evaluación General",
+                "puntos_obtenidos": score_val,
+                "puntos_maximos": 100,
+                "observaciones": obs,
+                "tipo_evaluador": t_eval
+            }
+
+            try:
+                res = requests.post(URL_SCRIPT, json=payload)
+                if res.text == "Éxito":
+                    st.success(f"✅ Evaluación de {ag_sel} guardada con {score_val}%")
+                    st.balloons()
+                else:
+                    st.error(f"Error del servidor: {res.text}")
+            except Exception as e:
+                st.error(f"Error de conexión: {e}")
 
 # --- MÓDULO: DASHBOARD ---
 elif choice == "Dashboard":
