@@ -13,20 +13,21 @@ URL_SCRIPT = "https://script.google.com/macros/s/AKfycbwOzQXYSGb1aFciCb28ivzWtV9
 # --- 2. CONEXIÓN A GOOGLE SHEET (LECTURA) ---
 def get_data():
     try:
-        # CORRECTO: Usamos el nombre de la llave que definiste en Secrets
-        # NO ponemos la URL aquí, usamos la palabra 'url_base'
-        url_base = st.secrets["url_base"]
+        # USAREMOS SOLO LA PALABRA 'url_base', NO LA URL LARGA
+        url_csv = st.secrets["url_base"]
         
-        # Truco para evitar el caché de Google y ver cambios al instante
-        url_fresca = f"{url_base}&cache_bust={datetime.now().timestamp()}"
+        # Este truco evita que Streamlit te muestre datos viejos (caché)
+        # Añade un marcador de tiempo para obligar a Google a darnos el archivo fresco
+        url_fresca = f"{url_csv}&cache_bust={datetime.now().timestamp()}"
         
         df = pd.read_csv(url_fresca)
         
-        # Limpieza de encabezados
+        # Limpieza de nombres de columnas por si tienen espacios invisibles
         df.columns = df.columns.str.strip()
+        
         return df
     except Exception as e:
-        # Esto te dirá el error real si algo más falla
+        # Si algo falla, esto nos dirá qué es sin detener toda la app
         st.error(f"Error al leer datos: {e}")
         return pd.DataFrame()
 
