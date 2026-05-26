@@ -11,25 +11,22 @@ st.set_page_config(page_title="QualityScore Enterprise", layout="wide")
 URL_SCRIPT = "https://script.google.com/macros/s/AKfycbwOzQXYSGb1aFciCb28ivzWtV9PjhITXKpacPTzpszvEoCFFcxlr5AUgn1V-g1lHyuJ/exec" 
 
 # --- 2. CONEXIÓN A GOOGLE SHEET (LECTURA) ---
-def get_data():
+def get_data(nombre_hoja="usuarios"):
     try:
-        # USAREMOS SOLO LA PALABRA 'url_base', NO LA URL LARGA
-        url_csv = st.secrets["url_base"]
+        # Extraemos la URL base (quitamos todo lo que hay después del /export...)
+        url_base = st.secrets["url_base"].split('/export')[0]
         
-        # Este truco evita que Streamlit te muestre datos viejos (caché)
-        # Añade un marcador de tiempo para obligar a Google a darnos el archivo fresco
-        url_fresca = f"{url_csv}&cache_bust={datetime.now().timestamp()}"
+        # Construimos la URL específica para la pestaña que necesitamos
+        # Esto elimina el error del gid=0 fijo
+        url_final = f"{url_base}/gviz/tq?tqx=out:csv&sheet={nombre_hoja}&cache={datetime.now().timestamp()}"
         
-        df = pd.read_csv(url_fresca)
-        
-        # Limpieza de nombres de columnas por si tienen espacios invisibles
+        df = pd.read_csv(url_final)
         df.columns = df.columns.str.strip()
-        
         return df
     except Exception as e:
-        # Si algo falla, esto nos dirá qué es sin detener toda la app
-        st.error(f"Error al leer datos: {e}")
+        st.error(f"Error al leer hoja {nombre_hoja}: {e}")
         return pd.DataFrame()
+
 
 # --- 3. LÓGICA DE SESIÓN ---
 if "autenticado" not in st.session_state:
@@ -119,9 +116,10 @@ elif choice == "Evaluador":
                     st.balloons()
 
 # --- MÓDULO 3: GESTIÓN CAMPAÑAS (RESTAURADO) ---
+
 elif choice == "Gestión Campañas":
     st.header("📁 Administración de Campañas")
-    df_c = get_data()
+    df_c = get_data("campañas")
     
     col1, col2 = st.columns([1, 2])
     with col1:
