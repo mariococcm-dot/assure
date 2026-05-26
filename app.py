@@ -170,16 +170,37 @@ elif choice == "Gestión Usuarios":
     with col_u1:
         st.subheader("Acciones")
         modo_u = st.radio("Operación:", ["Nuevo", "Modificar / Acción"])
-        
+            
         if modo_u == "Nuevo":
             nu = st.text_input("Username")
             np = st.text_input("Password", type="password")
             nr = st.selectbox("Rol", ["Administrador", "Evaluador", "Agente"])
-            nc_u = st.selectbox("Campaña", df_u['campaña'].unique().tolist() if not df_u.empty else ["Todas"])
+            
+            # --- CORRECCIÓN AQUÍ ---
+            # Traemos las campañas directamente de la hoja 'campañas'
+            df_camps_aux = get_data("campañas")
+            if not df_camps_aux.empty:
+                lista_c = df_camps_aux[df_camps_aux['estado'] == 'Activo']['campaña'].unique().tolist()
+            else:
+                lista_c = ["Todas"]
+            
+            nc_u = st.selectbox("Asignar a Campaña", lista_c)
+            # -----------------------
+
             if st.button("🚀 Registrar"):
-                payload = {"target_sheet": "usuarios", "action": "create", "username": nu, "password": np, "rol": nr, "campaña": nc_u}
-                requests.post(URL_SCRIPT, json=payload)
-                st.rerun()
+                payload = {
+                    "target_sheet": "usuarios", 
+                    "action": "create", 
+                    "username": nu, 
+                    "password": np, 
+                    "rol": nr, 
+                    "campaña": nc_u
+                }
+                res = requests.post(URL_SCRIPT, json=payload)
+                if res.text == "Éxito":
+                    st.success(f"Usuario {nu} registrado con éxito")
+                    st.rerun()
+        
         else:
             sel_user = st.selectbox("Usuario:", df_u['username'].tolist() if not df_u.empty else [])
             ub1, ub2, ub3 = st.columns(3)
