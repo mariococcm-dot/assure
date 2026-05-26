@@ -226,9 +226,22 @@ elif choice == "Gestión Usuarios":
                 requests.post(URL_SCRIPT, json={"target_sheet": "usuarios", "action": "delete", "user": sel_user})
                 st.rerun()
 
-    with col_u2:
+with col_u2:
         st.subheader("Lista de Personal")
-        st.dataframe(df_u[['username', 'rol', 'campaña', 'estado']] if not df_u.empty else pd.DataFrame())
+        if not df_u.empty:
+            # Definimos las columnas que queremos ver (siempre en minúsculas)
+            columnas_deseadas = ['username', 'rol', 'campaña', 'estado']
+            
+            # Solo mostramos las que realmente existan en el DataFrame
+            cols_reales = [c for c in columnas_deseadas if c in df_u.columns]
+            
+            if cols_reales:
+                st.dataframe(df_u[cols_reales], use_container_width=True, hide_index=True)
+            else:
+                st.warning(f"No se encontraron las columnas esperadas. Detectadas: {list(df_u.columns)}")
+        else:
+            st.info("No hay usuarios registrados en la pestaña 'usuarios'.")
+
 
 # --- MÓDULO 5: CONFIG SCORECARDS (ADAPTADO A GOOGLE SHEETS) ---
 elif choice == "Config Scorecards":
