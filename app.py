@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.express as px
 import requests
 from datetime import datetime
+from urllib.parse import quote # Esto permite traducir la "ñ" a código web
 
 # --- 1. CONFIGURACIÓN ---
 st.set_page_config(page_title="QualityScore Enterprise", layout="wide")
@@ -13,20 +14,25 @@ URL_SCRIPT = "https://script.google.com/macros/s/AKfycbwOzQXYSGb1aFciCb28ivzWtV9
 # --- 2. CONEXIÓN A GOOGLE SHEET (LECTURA) ---
 def get_data(nombre_hoja="usuarios"):
     try:
-        # Extraemos la URL base (quitamos todo lo que hay después del /export...)
+        # 1. Obtenemos la URL base de tus Secrets
         url_base = st.secrets["url_base"].split('/export')[0]
         
-        # Construimos la URL específica para la pestaña que necesitamos
-        # Esto elimina el error del gid=0 fijo
-        url_final = f"{url_base}/gviz/tq?tqx=out:csv&sheet={nombre_hoja}&cache={datetime.now().timestamp()}"
+        # 2. Traducimos el nombre de la hoja (ej. 'campañas' -> 'campa%C3%B1as')
+        nombre_hoja_web = quote(nombre_hoja)
+        
+        # 3. Construimos la URL final con el nombre ya traducido
+        url_final = f"{url_base}/gviz/tq?tqx=out:csv&sheet={nombre_hoja_web}&cache={datetime.now().timestamp()}"
         
         df = pd.read_csv(url_final)
+        
+        # Limpieza de nombres de columnas
         df.columns = df.columns.str.strip()
+        
         return df
     except Exception as e:
         st.error(f"Error al leer hoja {nombre_hoja}: {e}")
         return pd.DataFrame()
-
+        
 
 # --- 3. LÓGICA DE SESIÓN ---
 if "autenticado" not in st.session_state:
