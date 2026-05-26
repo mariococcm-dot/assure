@@ -20,15 +20,14 @@ def get_data(nombre_hoja="usuarios"):
         
         df = pd.read_csv(url_final)
         
-        # ESTA LÍNEA ES LA SOLUCIÓN:
-        # Convierte cualquier encabezado (ej. 'Username ', 'USERNAME') a 'username'
-        df.columns = df.columns.str.strip().str.lower()
-        
+        # Si el dataframe no está vacío, limpiamos columnas
+        if not df.empty:
+            # Convertimos todo a minúsculas y quitamos espacios
+            df.columns = [str(c).strip().lower() for c in df.columns]
         return df
     except Exception as e:
         st.error(f"Error al leer hoja {nombre_hoja}: {e}")
-        return pd.DataFrame()
-        
+        return pd.DataFrame()        
 
 # --- 3. LÓGICA DE SESIÓN ---
 if "autenticado" not in st.session_state:
@@ -38,16 +37,31 @@ if not st.session_state["autenticado"]:
     st.subheader("🔑 QualityScore Login")
     u_log = st.text_input("Usuario")
     p_log = st.text_input("Contraseña", type="password")
-    if st.button("Ingresar"):
-        df_db = get_data()
+   if st.button("Ingresar"):
+        df_db = get_data("usuarios")
+        
         if not df_db.empty:
-            user_row = df_db[(df_db['username'].astype(str) == u_log) & (df_db['password'].astype(str) == p_log)]
-            if not user_row.empty:
-                user = user_row.iloc[0]
-                st.session_state["autenticado"] = True
-                st.session_state["user_data"] = {"user": user['username'], "rol": user['rol'], "campaña": user['campaña']}
-                st.rerun()
-            else: st.error("❌ Credenciales incorrectas")
+            # Verificamos si las columnas existen después de la limpieza
+            if 'username' in df_db.columns and 'password' in df_db.columns:
+                # Buscamos al usuario
+                user_row = df_db[(df_db['username'].astype(str) == u_log) & 
+                                 (df_db['password'].astype(str) == p_log)]
+                
+                if not user_row.empty:
+                    user = user_row.iloc[0]
+                    st.session_state["autenticado"] = True
+                    st.session_state["user_data"] = {
+                        "user": user['username'], 
+                        "rol": user['rol'], 
+                        "campaña": user['campaña']
+                    }
+                    st.rerun()
+                else:
+                    st.error("❌ Usuario o contraseña incorrectos")
+            else:
+                st.error(f"❌ Error de estructura: Columnas encontradas: {list(df_db.columns)}. Se esperan: username, password, rol, campaña")
+        else:
+            st.error("❌ La base de datos de usuarios está vacía o no es accesible.")
     st.stop()
 
 # --- 4. BARRA LATERAL ---
