@@ -228,6 +228,7 @@ elif choice == "Gestión Usuarios":
 
 with col_u2:
         st.subheader("Lista de Personal")
+        df_u = get_data("usuarios")
         if not df_u.empty:
             # Definimos las columnas que queremos ver (siempre en minúsculas)
             columnas_deseadas = ['username', 'rol', 'campaña', 'estado']
@@ -236,11 +237,9 @@ with col_u2:
             cols_reales = [c for c in columnas_deseadas if c in df_u.columns]
             
             if cols_reales:
-                st.dataframe(df_u[cols_reales], use_container_width=True, hide_index=True)
+                    st.dataframe(df_u[cols_reales], use_container_width=True, hide_index=True)
             else:
-                st.warning(f"No se encontraron las columnas esperadas. Detectadas: {list(df_u.columns)}")
-        else:
-            st.info("No hay usuarios registrados en la pestaña 'usuarios'.")
+                st.info("No hay usuarios registrados.")
 
 
 # --- MÓDULO 5: CONFIG SCORECARDS (ADAPTADO A GOOGLE SHEETS) ---
