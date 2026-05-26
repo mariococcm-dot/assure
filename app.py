@@ -12,17 +12,21 @@ URL_SCRIPT = "https://script.google.com/macros/s/AKfycbwOzQXYSGb1aFciCb28ivzWtV9
 def get_data(nombre_hoja="usuarios"):
     try:
         url_base = st.secrets["url_base"].split('/export')[0]
+        # Agregamos parámetros para limpiar la respuesta de Google
         url_final = f"{url_base}/gviz/tq?tqx=out:csv&sheet={quote(nombre_hoja)}&cache={datetime.now().timestamp()}"
         
-        # AJUSTE AQUÍ: header=0 asegura que la fila 1 sean los títulos
-        df = pd.read_csv(url_final, header=0, skip_blank_lines=True)
+        # Leemos el CSV asegurando que la fila 1 es el encabezado y nada más
+        df = pd.read_csv(url_final, on_bad_lines='skip')
         
-        # Limpieza de nombres de columnas para que no tengan basura
         if not df.empty:
-            df.columns = [str(c).split('\n')[0].strip().lower() for c in df.columns]
+            # Limpiamos los encabezados de cualquier texto extra que Google pegue
+            df.columns = [str(c).strip().split('\n')[0].lower() for c in df.columns]
+            # Eliminamos filas que tengan el ID vacío (evita basura)
+            df = df.dropna(subset=[df.columns[0]])
         return df
-    except:
+    except Exception as e:
         return pd.DataFrame()
+
 
 # --- 2. LÓGICA DE LOGIN (ADMIN FIJO + EXCEL) ---
 if "autenticado" not in st.session_state:
