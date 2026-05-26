@@ -61,7 +61,7 @@ st.sidebar.write(f"Usuario: **{user_data['user']}**")
 st.sidebar.write(f"Rol: **{user_data['rol']}**")
 
 if user_data['rol'] == 'Administrador':
-    menu = ["Dashboard", "Evaluador", "Gestión Campañas", "Gestión Usuarios"]
+    menu = ["Dashboard", "Evaluador", "Gestión Campañas", "Gestión Usuarios", "Config Scorecards"]
 elif user_data['rol'] == 'Evaluador':
     menu = ["Dashboard", "Evaluador"]
 else:
