@@ -14,7 +14,7 @@ def get_data(nombre_hoja="usuarios"):
     try:
         url_base = st.secrets["url_base"].split('/export')[0]
         url_final = f"{url_base}/gviz/tq?tqx=out:csv&sheet={quote(nombre_hoja)}&cache={datetime.now().timestamp()}"
-        df = pd.read_csv(url_final)
+        df = pd.read_csv(url_final, header=0, skip_blank_lines=True)
         # Limpieza estándar de columnas
         if not df.empty:
             df.columns = [str(c).strip().lower() for c in df.columns]
