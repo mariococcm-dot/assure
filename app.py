@@ -20,8 +20,8 @@ def get_data(nombre_hoja="usuarios"):
         
         df = pd.read_csv(url_final)
         
-        # --- LIMPIEZA TOTAL DE COLUMNAS ---
-        # Esto convierte 'Username ' o 'USERNAME' en 'username' automáticamente
+        # ESTA LÍNEA ES LA SOLUCIÓN:
+        # Convierte cualquier encabezado (ej. 'Username ', 'USERNAME') a 'username'
         df.columns = df.columns.str.strip().str.lower()
         
         return df
