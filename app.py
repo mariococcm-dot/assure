@@ -14,19 +14,15 @@ URL_SCRIPT = "https://script.google.com/macros/s/AKfycbwOzQXYSGb1aFciCb28ivzWtV9
 # --- 2. CONEXIÓN A GOOGLE SHEET (LECTURA) ---
 def get_data(nombre_hoja="usuarios"):
     try:
-        # 1. Obtenemos la URL base de tus Secrets
         url_base = st.secrets["url_base"].split('/export')[0]
-        
-        # 2. Traducimos el nombre de la hoja (ej. 'campañas' -> 'campa%C3%B1as')
         nombre_hoja_web = quote(nombre_hoja)
-        
-        # 3. Construimos la URL final con el nombre ya traducido
         url_final = f"{url_base}/gviz/tq?tqx=out:csv&sheet={nombre_hoja_web}&cache={datetime.now().timestamp()}"
         
         df = pd.read_csv(url_final)
         
-        # Limpieza de nombres de columnas
-        df.columns = df.columns.str.strip()
+        # --- LIMPIEZA TOTAL DE COLUMNAS ---
+        # Esto convierte 'Username ' o 'USERNAME' en 'username' automáticamente
+        df.columns = df.columns.str.strip().str.lower()
         
         return df
     except Exception as e:
