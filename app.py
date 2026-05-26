@@ -173,11 +173,9 @@ elif choice == "Gestión Campañas":
         st.subheader("Campañas en Sistema")
         st.dataframe(df_c[['campaña', 'estado']].drop_duplicates() if not df_c.empty else pd.DataFrame())
 
-# --- MÓDULO GESTIÓN USUARIOS ---
-    elif choice == "Gestión Usuarios":
+elif choice == "Gestión Usuarios":
         st.header("👥 Gestión de Usuarios")
         df_u = get_data("usuarios")
-        
         col_u1, col_u2 = st.columns([1, 2])
         
         with col_u1:
@@ -186,30 +184,23 @@ elif choice == "Gestión Campañas":
                 nu = st.text_input("Username")
                 np = st.text_input("Password", type="password")
                 nr = st.selectbox("Rol", ["Administrador", "Evaluador", "Agente"])
-                
-                # Buscamos campañas para asignar
                 df_camps_aux = get_data("campañas")
                 lista_c = df_camps_aux[df_camps_aux['estado'] == 'Activo']['campaña'].unique().tolist() if not df_camps_aux.empty else ["Todas"]
                 nc_u = st.selectbox("Asignar a Campaña", lista_c)
-                
                 if st.button("🚀 Registrar"):
                     payload = {"target_sheet": "usuarios", "action": "create", "username": nu, "password": np, "rol": nr, "campaña": nc_u}
                     res = requests.post(URL_SCRIPT, json=payload)
                     if res.text == "Éxito":
-                        st.success(f"Usuario {nu} registrado")
-                        st.rerun()
+                        st.success(f"Usuario {nu} registrado"); st.rerun()
             else:
                 sel_user = st.selectbox("Usuario:", df_u['username'].tolist() if not df_u.empty else [])
                 ub1, ub2, ub3 = st.columns(3)
                 if ub1.button("✅ Habilitar"):
-                    requests.post(URL_SCRIPT, json={"target_sheet": "usuarios", "action": "status", "user": sel_user, "val": "Activo"})
-                    st.rerun()
+                    requests.post(URL_SCRIPT, json={"target_sheet": "usuarios", "action": "status", "user": sel_user, "val": "Activo"}); st.rerun()
                 if ub2.button("🚫 Deshabilitar"):
-                    requests.post(URL_SCRIPT, json={"target_sheet": "usuarios", "action": "status", "user": sel_user, "val": "Inactivo"})
-                    st.rerun()
+                    requests.post(URL_SCRIPT, json={"target_sheet": "usuarios", "action": "status", "user": sel_user, "val": "Inactivo"}); st.rerun()
                 if ub3.button("🗑️ Borrar"):
-                    requests.post(URL_SCRIPT, json={"target_sheet": "usuarios", "action": "delete", "user": sel_user})
-                    st.rerun()
+                    requests.post(URL_SCRIPT, json={"target_sheet": "usuarios", "action": "delete", "user": sel_user}); st.rerun()
 
         with col_u2:
             st.subheader("Lista de Personal")
@@ -217,14 +208,10 @@ elif choice == "Gestión Campañas":
                 columnas_deseadas = ['username', 'rol', 'campaña', 'estado']
                 cols_reales = [c for c in columnas_deseadas if c in df_u.columns]
                 st.dataframe(df_u[cols_reales], use_container_width=True, hide_index=True)
-            else:
-                st.info("No hay usuarios registrados.")
 
-    # --- MÓDULO CONFIG SCORECARDS (Nivelado correctamente) ---
     elif choice == "Config Scorecards":
         st.header("⚙️ Configuración de Scorecards")
         df_camps = get_data("campañas")
-        
         if df_camps.empty:
             st.warning("Crea una campaña activa primero.")
         else:
@@ -242,9 +229,7 @@ elif choice == "Gestión Campañas":
                             payload = {"target_sheet": "scorecards", "action": "create", "area": f_c, "pregunta": f_p, "puntos": f_pts, "tipo": f_t}
                             res = requests.post(URL_SCRIPT, json=payload)
                             if res.text == "Éxito":
-                                st.success("Criterio añadido")
-                                st.rerun()
-        
+                                st.success("Criterio añadido"); st.rerun()
         st.markdown("---")
         df_sc = get_data("scorecards")
         if not df_sc.empty:
