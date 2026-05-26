@@ -29,7 +29,8 @@ def get_data(nombre_hoja="usuarios"):
         st.error(f"Error al leer hoja {nombre_hoja}: {e}")
         return pd.DataFrame()        
 
-# --- 3. LÓGICA DE SESIÓN ---
+# --- 3. LÓGICA DE SESIÓN (CORREGIDA) ---
+
 if "autenticado" not in st.session_state:
     st.session_state["autenticado"] = False
 
@@ -37,13 +38,13 @@ if not st.session_state["autenticado"]:
     st.subheader("🔑 QualityScore Login")
     u_log = st.text_input("Usuario")
     p_log = st.text_input("Contraseña", type="password")
-   if st.button("Ingresar"):
+    
+    if st.button("Ingresar"):
         df_db = get_data("usuarios")
         
         if not df_db.empty:
-            # Verificamos si las columnas existen después de la limpieza
+            # Verificamos si las columnas existen tras la limpieza de get_data
             if 'username' in df_db.columns and 'password' in df_db.columns:
-                # Buscamos al usuario
                 user_row = df_db[(df_db['username'].astype(str) == u_log) & 
                                  (df_db['password'].astype(str) == p_log)]
                 
@@ -59,10 +60,11 @@ if not st.session_state["autenticado"]:
                 else:
                     st.error("❌ Usuario o contraseña incorrectos")
             else:
-                st.error(f"❌ Error de estructura: Columnas encontradas: {list(df_db.columns)}. Se esperan: username, password, rol, campaña")
+                st.error(f"❌ Error de estructura. Columnas detectadas: {list(df_db.columns)}")
         else:
-            st.error("❌ La base de datos de usuarios está vacía o no es accesible.")
+            st.error("❌ No se pudo leer la base de datos de usuarios.")
     st.stop()
+
 
 # --- 4. BARRA LATERAL ---
 user_data = st.session_state["user_data"]
