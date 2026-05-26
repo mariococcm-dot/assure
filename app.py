@@ -173,121 +173,81 @@ elif choice == "Gestión Campañas":
         st.subheader("Campañas en Sistema")
         st.dataframe(df_c[['campaña', 'estado']].drop_duplicates() if not df_c.empty else pd.DataFrame())
 
-# --- MÓDULO 4: GESTIÓN USUARIOS (RESTAURADO) ---
-elif choice == "Gestión Usuarios":
-    st.header("👥 Gestión de Usuarios")
-    df_u = get_data()
-    
-    col_u1, col_u2 = st.columns([1, 2])
-    with col_u1:
-        st.subheader("Acciones")
-        modo_u = st.radio("Operación:", ["Nuevo", "Modificar / Acción"])
-            
-        if modo_u == "Nuevo":
-            nu = st.text_input("Username")
-            np = st.text_input("Password", type="password")
-            nr = st.selectbox("Rol", ["Administrador", "Evaluador", "Agente"])
-            
-            # --- CORRECCIÓN AQUÍ ---
-            # Traemos las campañas directamente de la hoja 'campañas'
-            df_camps_aux = get_data("campañas")
-            if not df_camps_aux.empty:
-                lista_c = df_camps_aux[df_camps_aux['estado'] == 'Activo']['campaña'].unique().tolist()
-            else:
-                lista_c = ["Todas"]
-            
-            nc_u = st.selectbox("Asignar a Campaña", lista_c)
-            # -----------------------
-
-            if st.button("🚀 Registrar"):
-                payload = {
-                    "target_sheet": "usuarios", 
-                    "action": "create", 
-                    "username": nu, 
-                    "password": np, 
-                    "rol": nr, 
-                    "campaña": nc_u
-                }
-                res = requests.post(URL_SCRIPT, json=payload)
-                if res.text == "Éxito":
-                    st.success(f"Usuario {nu} registrado con éxito")
-                    st.rerun()
-        
-        else:
-            sel_user = st.selectbox("Usuario:", df_u['username'].tolist() if not df_u.empty else [])
-            ub1, ub2, ub3 = st.columns(3)
-            if ub1.button("✅ Habilitar"):
-                requests.post(URL_SCRIPT, json={"target_sheet": "usuarios", "action": "status", "user": sel_user, "val": "Activo"})
-                st.rerun()
-            if ub2.button("🚫 Deshabilitar"):
-                requests.post(URL_SCRIPT, json={"target_sheet": "usuarios", "action": "status", "user": sel_user, "val": "Inactivo"})
-                st.rerun()
-            if ub3.button("🗑️ Borrar"):
-                requests.post(URL_SCRIPT, json={"target_sheet": "usuarios", "action": "delete", "user": sel_user})
-                st.rerun()
-
-with col_u2:
-        st.subheader("Lista de Personal")
+# --- MÓDULO GESTIÓN USUARIOS ---
+    elif choice == "Gestión Usuarios":
+        st.header("👥 Gestión de Usuarios")
         df_u = get_data("usuarios")
-        if not df_u.empty:
-            # Definimos las columnas que queremos ver (siempre en minúsculas)
-            columnas_deseadas = ['username', 'rol', 'campaña', 'estado']
-            
-            # Solo mostramos las que realmente existan en el DataFrame
-            cols_reales = [c for c in columnas_deseadas if c in df_u.columns]
-            
-            if cols_reales:
-                    st.dataframe(df_u[cols_reales], use_container_width=True, hide_index=True)
+        
+        col_u1, col_u2 = st.columns([1, 2])
+        
+        with col_u1:
+            modo_u = st.radio("Acción", ["Nuevo", "Editar/Borrar"])
+            if modo_u == "Nuevo":
+                nu = st.text_input("Username")
+                np = st.text_input("Password", type="password")
+                nr = st.selectbox("Rol", ["Administrador", "Evaluador", "Agente"])
+                
+                # Buscamos campañas para asignar
+                df_camps_aux = get_data("campañas")
+                lista_c = df_camps_aux[df_camps_aux['estado'] == 'Activo']['campaña'].unique().tolist() if not df_camps_aux.empty else ["Todas"]
+                nc_u = st.selectbox("Asignar a Campaña", lista_c)
+                
+                if st.button("🚀 Registrar"):
+                    payload = {"target_sheet": "usuarios", "action": "create", "username": nu, "password": np, "rol": nr, "campaña": nc_u}
+                    res = requests.post(URL_SCRIPT, json=payload)
+                    if res.text == "Éxito":
+                        st.success(f"Usuario {nu} registrado")
+                        st.rerun()
+            else:
+                sel_user = st.selectbox("Usuario:", df_u['username'].tolist() if not df_u.empty else [])
+                ub1, ub2, ub3 = st.columns(3)
+                if ub1.button("✅ Habilitar"):
+                    requests.post(URL_SCRIPT, json={"target_sheet": "usuarios", "action": "status", "user": sel_user, "val": "Activo"})
+                    st.rerun()
+                if ub2.button("🚫 Deshabilitar"):
+                    requests.post(URL_SCRIPT, json={"target_sheet": "usuarios", "action": "status", "user": sel_user, "val": "Inactivo"})
+                    st.rerun()
+                if ub3.button("🗑️ Borrar"):
+                    requests.post(URL_SCRIPT, json={"target_sheet": "usuarios", "action": "delete", "user": sel_user})
+                    st.rerun()
+
+        with col_u2:
+            st.subheader("Lista de Personal")
+            if not df_u.empty:
+                columnas_deseadas = ['username', 'rol', 'campaña', 'estado']
+                cols_reales = [c for c in columnas_deseadas if c in df_u.columns]
+                st.dataframe(df_u[cols_reales], use_container_width=True, hide_index=True)
             else:
                 st.info("No hay usuarios registrados.")
 
-
-# --- MÓDULO 5: CONFIG SCORECARDS (ADAPTADO A GOOGLE SHEETS) ---
-elif choice == "Config Scorecards":
-    st.header("⚙️ Configuración de Scorecards")
-    
-    # 1. Obtenemos campañas activas desde la hoja 'campañas'
-    df_camps = get_data("campañas")
-    if df_camps.empty:
-        st.warning("Crea una campaña activa primero.")
-    else:
-        # Filtramos solo las que están 'Activo'
-        c_act = df_camps[df_camps['estado'] == 'Activo']['campaña'].tolist()
+    # --- MÓDULO CONFIG SCORECARDS (Nivelado correctamente) ---
+    elif choice == "Config Scorecards":
+        st.header("⚙️ Configuración de Scorecards")
+        df_camps = get_data("campañas")
         
-        if not c_act:
-            st.warning("No hay campañas activas en el sistema.")
+        if df_camps.empty:
+            st.warning("Crea una campaña activa primero.")
         else:
-            with st.form("sc"):
-                f_c = st.selectbox("Campaña", c_act)
-                f_p = st.text_input("Criterio")
-                f_t = st.selectbox("Tipo", ["Escala (Slider)", "Sí / No"])
-                f_pts = st.number_input("Puntos", 1, 100, 10)
-                
-                if st.form_submit_button("Añadir"):
-                    if f_p:
-                        # Enviamos a la pestaña 'scorecards' mediante el script
-                        payload = {
-                            "target_sheet": "scorecards",
-                            "action": "create",
-                            "area": f_c,
-                            "pregunta": f_p,
-                            "puntos": f_pts,
-                            "tipo": f_t
-                        }
-                        res = requests.post(URL_SCRIPT, json=payload)
-                        if res.text == "Éxito":
-                            st.success(f"✅ Criterio '{f_p}' añadido a {f_c}")
-                            st.rerun()
-                        else:
-                            st.error(f"Error al guardar: {res.text}")
-                    else:
-                        st.error("Por favor escribe un nombre para el criterio.")
-    
-    st.markdown("---")
-    st.subheader("Criterios Configurados")
-    # Leemos la pestaña 'scorecards' para mostrar lo que ya existe
-    df_sc = get_data("scorecards")
-    if not df_sc.empty:
-        st.dataframe(df_sc, use_container_width=True, hide_index=True)
-    else:
-        st.info("Aún no hay criterios configurados en el Scorecard.")
+            c_act = df_camps[df_camps['estado'] == 'Activo']['campaña'].tolist()
+            if not c_act:
+                st.warning("No hay campañas activas.")
+            else:
+                with st.form("sc"):
+                    f_c = st.selectbox("Campaña", c_act)
+                    f_p = st.text_input("Criterio")
+                    f_t = st.selectbox("Tipo", ["Escala (Slider)", "Sí / No"])
+                    f_pts = st.number_input("Puntos", 1, 100, 10)
+                    if st.form_submit_button("Añadir"):
+                        if f_p:
+                            payload = {"target_sheet": "scorecards", "action": "create", "area": f_c, "pregunta": f_p, "puntos": f_pts, "tipo": f_t}
+                            res = requests.post(URL_SCRIPT, json=payload)
+                            if res.text == "Éxito":
+                                st.success("Criterio añadido")
+                                st.rerun()
+        
+        st.markdown("---")
+        df_sc = get_data("scorecards")
+        if not df_sc.empty:
+            st.dataframe(df_sc, use_container_width=True, hide_index=True)
+
+
