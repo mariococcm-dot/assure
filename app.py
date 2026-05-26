@@ -13,20 +13,20 @@ URL_SCRIPT = "https://script.google.com/macros/s/AKfycbwOzQXYSGb1aFciCb28ivzWtV9
 # --- 2. CONEXIÓN A GOOGLE SHEET (LECTURA) ---
 def get_data():
     try:
-        url_base = st.secrets["https://docs.google.com/spreadsheets/d/145J2pcrSh3Zki5U5ThbqHA62zeybyHTF-GJogMEbIco/export?format=csv&gid=0"]
-        # El cache_bust obliga a Google a darnos el archivo más nuevo
+        # CORRECTO: Usamos el nombre de la llave que definiste en Secrets
+        # NO ponemos la URL aquí, usamos la palabra 'url_base'
+        url_base = st.secrets["url_base"]
+        
+        # Truco para evitar el caché de Google y ver cambios al instante
         url_fresca = f"{url_base}&cache_bust={datetime.now().timestamp()}"
         
         df = pd.read_csv(url_fresca)
         
-        # LIMPIEZA CRÍTICA:
-        # 1. Quitamos espacios vacíos en los nombres de las columnas
-        df.columns = df.columns.str.strip().str.lower() 
-        # 2. Quitamos espacios vacíos en los datos de las celdas
-        df = df.apply(lambda x: x.str.strip() if x.dtype == "object" else x)
-        
+        # Limpieza de encabezados
+        df.columns = df.columns.str.strip()
         return df
     except Exception as e:
+        # Esto te dirá el error real si algo más falla
         st.error(f"Error al leer datos: {e}")
         return pd.DataFrame()
 
