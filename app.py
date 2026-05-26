@@ -173,7 +173,8 @@ elif choice == "Gestión Campañas":
         st.subheader("Campañas en Sistema")
         st.dataframe(df_c[['campaña', 'estado']].drop_duplicates() if not df_c.empty else pd.DataFrame())
 
-elif choice == "Gestión Usuarios":
+# --- MÓDULO GESTIÓN USUARIOS ---
+    elif choice == "Gestión Usuarios":
         st.header("👥 Gestión de Usuarios")
         df_u = get_data("usuarios")
         col_u1, col_u2 = st.columns([1, 2])
@@ -209,6 +210,7 @@ elif choice == "Gestión Usuarios":
                 cols_reales = [c for c in columnas_deseadas if c in df_u.columns]
                 st.dataframe(df_u[cols_reales], use_container_width=True, hide_index=True)
 
+    # --- MÓDULO CONFIG SCORECARDS ---
     elif choice == "Config Scorecards":
         st.header("⚙️ Configuración de Scorecards")
         df_camps = get_data("campañas")
@@ -234,5 +236,4 @@ elif choice == "Gestión Usuarios":
         df_sc = get_data("scorecards")
         if not df_sc.empty:
             st.dataframe(df_sc, use_container_width=True, hide_index=True)
-
 
