@@ -13,12 +13,18 @@ URL_SCRIPT = "https://script.google.com/macros/s/AKfycbwOzQXYSGb1aFciCb28ivzWtV9
 # --- 2. CONEXIÓN A GOOGLE SHEET (LECTURA) ---
 def get_data():
     try:
-        # Busca la URL del CSV en tus Secrets de Streamlit
-        url = st.secrets["url_base"]
-        df = pd.read_csv(url)
+        # Recuperamos la URL base de tus secrets
+        url_base = st.secrets["url_base"]
+        
+        # Añadimos un parámetro aleatorio al final de la URL para saltar el caché
+        # Esto obliga a Google Sheets a darnos los datos en tiempo real
+        url_fresca = f"{url_base}&cache_bust={datetime.now().timestamp()}"
+        
+        df = pd.read_csv(url_fresca)
         df.columns = df.columns.str.strip()
         return df
-    except Exception:
+    except Exception as e:
+        st.error(f"Error al leer datos: {e}")
         return pd.DataFrame()
 
 # --- 3. LÓGICA DE SESIÓN ---
