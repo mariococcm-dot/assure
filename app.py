@@ -7,17 +7,19 @@ from urllib.parse import quote
 # --- 1. CONFIGURACIÓN ---
 st.set_page_config(page_title="QualityScore Enterprise", layout="wide")
 
-# URL de tu Apps Script (Asegúrate de que sea la última versión implementada)
 URL_SCRIPT = "https://script.google.com/macros/s/AKfycbwOzQXYSGb1aFciCb28ivzWtV9PjhITXKpacPTzpszvEoCFFcxlr5AUgn1V-g1lHyuJ/exec" 
 
 def get_data(nombre_hoja="usuarios"):
     try:
         url_base = st.secrets["url_base"].split('/export')[0]
         url_final = f"{url_base}/gviz/tq?tqx=out:csv&sheet={quote(nombre_hoja)}&cache={datetime.now().timestamp()}"
+        
+        # AJUSTE AQUÍ: header=0 asegura que la fila 1 sean los títulos
         df = pd.read_csv(url_final, header=0, skip_blank_lines=True)
-        # Limpieza estándar de columnas
+        
+        # Limpieza de nombres de columnas para que no tengan basura
         if not df.empty:
-            df.columns = [str(c).strip().lower() for c in df.columns]
+            df.columns = [str(c).split('\n')[0].strip().lower() for c in df.columns]
         return df
     except:
         return pd.DataFrame()
@@ -32,18 +34,15 @@ if not st.session_state["autenticado"]:
     p_log = st.text_input("Contraseña", type="password").strip()
     
     if st.button("Ingresar"):
-        # Prioridad 1: Admin Fijo
         if u_log == "admin" and p_log == "admin123":
             st.session_state["autenticado"] = True
             st.session_state["user_data"] = {"username": "admin", "nombre": "Administrador", "rol": "Administrador", "campaña": "Todas"}
             st.rerun()
         
-        # Prioridad 2: Base de datos Excel
         df_db = get_data("usuarios")
         if not df_db.empty:
             encontrado = False
             for _, row in df_db.iterrows():
-                # Columna 0 (username) y Columna 2 (password)
                 if str(row.iloc[0]).strip() == u_log and str(row.iloc[2]).strip() == p_log:
                     st.session_state["autenticado"] = True
                     st.session_state["user_data"] = {
@@ -71,16 +70,14 @@ if st.sidebar.button("🚪 Cerrar Sesión"):
 
 # --- 4. MÓDULOS ---
 
-# --- DASHBOARD ---
 if choice == "Dashboard":
     st.header("📊 Dashboard de Calidad")
     df_ev = get_data("evaluaciones")
     if not df_ev.empty:
         st.metric("Total Evaluaciones", len(df_ev))
         st.dataframe(df_ev, use_container_width=True, hide_index=True)
-    else: st.info("No hay datos de evaluaciones aún.")
+    else: st.info("No hay datos.")
 
-# --- EVALUADOR ---
 elif choice == "Evaluador":
     st.header("📝 Módulo de Evaluación")
     df_u = get_data("usuarios")
@@ -91,7 +88,7 @@ elif choice == "Evaluador":
         c_list = df_c.iloc[:,0].tolist() if not df_c.empty else ["General"]
         c_sel = col1.selectbox("Campaña", c_list)
         
-        ags = df_u[df_u.iloc[:,3].str.lower() == 'agente'] if not df_u.empty else pd.DataFrame()
+        ags = df_u[df_u.iloc[:,3].astype(str).str.lower() == 'agente'] if not df_u.empty else pd.DataFrame()
         ag_list = (ags.iloc[:,0].astype(str) + " - " + ags.iloc[:,1].astype(str)).tolist()
         ag_sel = col2.selectbox("Agente", ag_list if ag_list else ["Sin agentes"])
         
@@ -106,9 +103,8 @@ elif choice == "Evaluador":
                 "evaluador": user['username'], "observaciones": obs
             }
             requests.post(URL_SCRIPT, json=payload)
-            st.success("✅ Evaluación registrada correctamente")
+            st.success("✅ Evaluación registrada")
 
-# --- GESTIÓN CAMPAÑAS ---
 elif choice == "Gestión Campañas":
     st.header("📁 Administración de Campañas")
     df_c = get_data("campañas")
@@ -120,7 +116,6 @@ elif choice == "Gestión Campañas":
             st.rerun()
     with c2: st.dataframe(df_c, use_container_width=True, hide_index=True)
 
-# --- GESTIÓN USUARIOS ---
 elif choice == "Gestión Usuarios":
     st.header("👥 Gestión de Personal")
     df_u = get_data("usuarios")
@@ -138,7 +133,6 @@ elif choice == "Gestión Usuarios":
             
             b_reg, b_mod = st.columns(2)
             if b_reg.button("🚀 Registrar"):
-                # ORDEN ESTRICTO: A=username, B=nombre, C=password, D=rol, E=campaña, F=estado
                 p = {"target_sheet":"usuarios","action":"create","username":u_id,"nombre":u_nom,"password":u_pass,"rol":u_rol,"campaña":u_camp,"estado":"Activo"}
                 requests.post(URL_SCRIPT, json=p); st.rerun()
             if b_mod.button("📝 Modificar"):
@@ -147,7 +141,6 @@ elif choice == "Gestión Usuarios":
         
         st.divider()
         if not df_u.empty:
-            st.subheader("Acciones Rápidas")
             u_sel = st.selectbox("Seleccionar ID:", df_u.iloc[:,0].tolist())
             a1, a2 = st.columns(2)
             if a1.button("🚫 Inhabilitar"):
@@ -157,9 +150,9 @@ elif choice == "Gestión Usuarios":
 
     with col_r:
         st.subheader("Lista de Usuarios")
+        # Mostrar la tabla limpia
         st.dataframe(df_u, use_container_width=True, hide_index=True)
 
-# --- CONFIG SCORECARDS ---
 elif choice == "Config Scorecards":
     st.header("⚙️ Configuración de Scorecards")
     df_sc = get_data("scorecards")
