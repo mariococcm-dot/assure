@@ -196,3 +196,53 @@ elif choice == "Gestión Usuarios":
     with col_u2:
         st.subheader("Lista de Personal")
         st.dataframe(df_u[['username', 'rol', 'campaña', 'estado']] if not df_u.empty else pd.DataFrame())
+
+# --- MÓDULO 5: CONFIG SCORECARDS (ADAPTADO A GOOGLE SHEETS) ---
+elif choice == "Config Scorecards":
+    st.header("⚙️ Configuración de Scorecards")
+    
+    # 1. Obtenemos campañas activas desde la hoja 'campañas'
+    df_camps = get_data("campañas")
+    if df_camps.empty:
+        st.warning("Crea una campaña activa primero.")
+    else:
+        # Filtramos solo las que están 'Activo'
+        c_act = df_camps[df_camps['estado'] == 'Activo']['campaña'].tolist()
+        
+        if not c_act:
+            st.warning("No hay campañas activas en el sistema.")
+        else:
+            with st.form("sc"):
+                f_c = st.selectbox("Campaña", c_act)
+                f_p = st.text_input("Criterio")
+                f_t = st.selectbox("Tipo", ["Escala (Slider)", "Sí / No"])
+                f_pts = st.number_input("Puntos", 1, 100, 10)
+                
+                if st.form_submit_button("Añadir"):
+                    if f_p:
+                        # Enviamos a la pestaña 'scorecards' mediante el script
+                        payload = {
+                            "target_sheet": "scorecards",
+                            "action": "create",
+                            "area": f_c,
+                            "pregunta": f_p,
+                            "puntos": f_pts,
+                            "tipo": f_t
+                        }
+                        res = requests.post(URL_SCRIPT, json=payload)
+                        if res.text == "Éxito":
+                            st.success(f"✅ Criterio '{f_p}' añadido a {f_c}")
+                            st.rerun()
+                        else:
+                            st.error(f"Error al guardar: {res.text}")
+                    else:
+                        st.error("Por favor escribe un nombre para el criterio.")
+    
+    st.markdown("---")
+    st.subheader("Criterios Configurados")
+    # Leemos la pestaña 'scorecards' para mostrar lo que ya existe
+    df_sc = get_data("scorecards")
+    if not df_sc.empty:
+        st.dataframe(df_sc, use_container_width=True, hide_index=True)
+    else:
+        st.info("Aún no hay criterios configurados en el Scorecard.")
