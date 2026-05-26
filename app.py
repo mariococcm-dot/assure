@@ -107,4 +107,28 @@ elif choice == "Gestión Usuarios":
             nom_u = st.text_input("Nombre")
             pass_u = st.text_input("Pass")
             rol_u = st.selectbox("Rol", ["Administrador", "Evaluador", "Agente"])
-            camp_u = st.
+            camp_u = st.text_input("Campaña")
+            b1, b2 = st.columns(2)
+            if b1.button("🚀 Registrar"):
+                requests.post(URL_SCRIPT, json={"target_sheet":"usuarios","action":"create","username":id_u,"nombre":nom_u,"password":pass_u,"rol":rol_u,"campaña":camp_u}); st.rerun()
+            if b2.button("📝 Modificar"):
+                requests.post(URL_SCRIPT, json={"target_sheet":"usuarios","action":"update","username":id_u,"nombre":nom_u,"password":pass_u,"rol":rol_u,"campaña":camp_u}); st.rerun()
+        if not df_u.empty:
+            st.divider()
+            u_sel = st.selectbox("Acción para:", df_u.iloc[:,0].tolist())
+            c1, c2 = st.columns(2)
+            if c1.button("🚫 Inh."):
+                requests.post(URL_SCRIPT, json={"target_sheet":"usuarios","action":"status","user":u_sel,"val":"Inactivo"}); st.rerun()
+            if c2.button("🗑️ Del."):
+                requests.post(URL_SCRIPT, json={"target_sheet":"usuarios","action":"delete","user":u_sel}); st.rerun()
+    with col_r: st.dataframe(df_u, use_container_width=True)
+
+elif choice == "Config Scorecards":
+    st.header("⚙️ Scorecards")
+    df_sc = get_data("scorecards")
+    with st.container(border=True):
+        f_p = st.text_input("Pregunta")
+        if st.button("Añadir"):
+            requests.post(URL_SCRIPT, json={"target_sheet":"scorecards","action":"create","pregunta":f_p})
+            st.rerun()
+    st.dataframe(df_sc, use_container_width=True)
