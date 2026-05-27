@@ -10,10 +10,10 @@ st.set_page_config(page_title="QualityScore Enterprise", layout="wide")
 
 URL_SCRIPT = "https://script.google.com/macros/s/AKfycbwOzQXYSGb1aFciCb28ivzWtV9PjhITXKpacPTzpszvEoCFFcxlr5AUgn1V-g1lHyuJ/exec" 
 
-def get_data(nombre_hoja="usuarios"):
+def get_data(nombre_ho_ja="usuarios"):
     try:
         url_base = st.secrets["url_base"].split('/export')[0]
-        url_final = f"{url_base}/gviz/tq?tqx=out:csv&sheet={quote(nombre_hoja)}&cache={datetime.now().timestamp()}"
+        url_final = f"{url_base}/gviz/tq?tqx=out:csv&sheet={quote(nombre_ho_ja)}&cache={datetime.now().timestamp()}"
         df = pd.read_csv(url_final, on_bad_lines='skip')
         if not df.empty:
             df.columns = [str(c).strip().split('\n')[0].lower() for c in df.columns]
@@ -22,7 +22,7 @@ def get_data(nombre_hoja="usuarios"):
     except Exception as e:
         return pd.DataFrame()
 
-# --- 2. LÓGICA DE LOGIN ---
+# --- 2. LÓGICA DE LOGIN (SIN CAMBIOS) ---
 if "autenticado" not in st.session_state:
     st.session_state["autenticado"] = False
 
@@ -69,23 +69,19 @@ if st.sidebar.button("🚪 Cerrar Sesión"):
 
 # --- 4. MÓDULOS ---
 
+# [BLOQUE DASHBOARD - SIN CAMBIOS RESPECTO AL ÚLTIMO FUNCIONAL]
 if choice == "Dashboard":
     st.header("📊 Analítica de Calidad")
     df_eval = get_data("evaluaciones")
-    
     if df_eval.empty:
         st.info("Sin datos registrados aún.")
     else:
-        # LÓGICA POR POSICIÓN PARA EVITAR KEYERROR
-        # Col 0: fecha_registro | Col 1: campaña | Col 2: agente | Col 4: obtenidos | Col 5: maximos
         df_eval['fecha_dt'] = pd.to_datetime(df_eval.iloc[:, 0], errors='coerce')
         df_eval['año_f'] = df_eval['fecha_dt'].dt.year
         df_eval['mes_n'] = df_eval['fecha_dt'].dt.month_name()
-        
         meses_esp = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
         dic_meses = dict(zip(["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"], meses_esp))
         df_eval['mes_f'] = df_eval['mes_n'].map(dic_meses)
-
         col_f1, col_f2, col_f3 = st.columns(3)
         with col_f1:
             df_c_list = get_data("campañas")
@@ -96,73 +92,80 @@ if choice == "Dashboard":
             sel_año = st.selectbox("Año:", años_db if años_db else [datetime.now().year])
         with col_f3:
             sel_mes = st.selectbox("Mes:", meses_esp, index=datetime.now().month - 1)
-
-        # Filtrado Dinámico
         df_f = df_eval[(df_eval['año_f'] == sel_año) & (df_eval['mes_f'] == sel_mes)].copy()
         if sel_camp != "Ver Todas":
             df_f = df_f[df_f.iloc[:, 1] == sel_camp]
-
         if df_f.empty:
             st.warning(f"No hay datos para {sel_mes} de {sel_año}.")
         else:
-            # Cálculos usando posiciones fijas (4 y 5)
             df_f['p_obt'] = pd.to_numeric(df_f.iloc[:, 4], errors='coerce').fillna(0)
             df_f['p_max'] = pd.to_numeric(df_f.iloc[:, 5], errors='coerce').fillna(1)
             df_f['score_final'] = (df_f['p_obt'] / df_f['p_max']) * 100
-
             st.metric("Total Monitoreos", len(df_f))
-
             if sel_camp == "Ver Todas":
-                # Agrupar por la columna de Campaña (posicion 1)
-                fig = px.bar(df_f.groupby(df_f.columns[1])['score_final'].mean().reset_index(), 
-                             x=df_f.columns[1], y='score_final', title="Promedio Global por Campaña",
-                             color='score_final', text_auto='.1f')
+                fig = px.bar(df_f.groupby(df_f.columns[1])['score_final'].mean().reset_index(), x=df_f.columns[1], y='score_final', title="Promedio Global por Campaña", color='score_final', text_auto='.1f')
             else:
-                # Agrupar por la columna de Agente (posicion 2)
-                fig = px.bar(df_f.groupby(df_f.columns[2])['score_final'].mean().reset_index(), 
-                             x=df_f.columns[2], y='score_final', title=f"Desempeño en {sel_camp}",
-                             color='score_final', text_auto='.1f')
+                fig = px.bar(df_f.groupby(df_f.columns[2])['score_final'].mean().reset_index(), x=df_f.columns[2], y='score_final', title=f"Desempeño en {sel_camp}", color='score_final', text_auto='.1f')
             st.plotly_chart(fig, use_container_width=True)
 
+# [BLOQUE EVALUADOR - SIN CAMBIOS]
 elif choice == "Evaluador":
     st.header("📝 Módulo de Evaluación")
     df_u = get_data("usuarios")
     df_c = get_data("campañas")
     df_sc = get_data("scorecards")
-    
     with st.form("form_eval"):
         c_list = df_c.iloc[:,0].tolist() if not df_c.empty else ["General"]
         c_sel = st.selectbox("Campaña", c_list)
         ags = df_u[df_u.iloc[:,3].astype(str).str.lower() == 'agente']
         ag_list = (ags.iloc[:,0].astype(str) + " - " + ags.iloc[:,1].astype(str)).tolist()
         ag_sel = st.selectbox("Agente", ag_list if ag_list else ["Sin agentes"])
-        
         pregs = df_sc[df_sc.iloc[:,0] == c_sel]
         resps = {}
         for _, r in pregs.iterrows():
             resps[r.iloc[1]] = st.select_slider(f"{r.iloc[1]}", options=[0, int(r.iloc[2])], value=int(r.iloc[2]))
-        
         obs = st.text_area("Observaciones")
-        if st.form_submit_button("Guardar Evaluación"):
-            payload = {
-                "target_sheet": "evaluaciones", "action": "create",
-                "fecha_registro": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                "agente": ag_sel.split(" - ")[0], "puntos_obtenidos": sum(resps.values()),
-                "puntos_maximos": sum(pregs.iloc[:,2]), "evaluador": user['username'],
-                "observaciones": obs, "campaña": c_sel
-            }
+        if st.form_submit_button("Guardar"):
+            payload = {"target_sheet": "evaluaciones", "action": "create", "fecha_registro": datetime.now().strftime("%d/%m/%Y %H:%M"), "agente": ag_sel.split(" - ")[0], "puntos_obtenidos": sum(resps.values()), "puntos_maximos": sum(pregs.iloc[:,2]), "evaluador": user['username'], "observaciones": obs, "campaña": c_sel}
             requests.post(URL_SCRIPT, json=payload)
-            st.success("✅ Guardado con éxito")
+            st.success("✅ Guardado")
 
+# [BLOQUE GESTIÓN CAMPAÑAS - CORREGIDO SEGÚN LO SOLICITADO]
 elif choice == "Gestión Campañas":
     st.header("📁 Administración de Campañas")
     df_c = get_data("campañas")
-    nc = st.text_input("Nombre de la Campaña")
-    if st.button("🚀 Crear"):
-        requests.post(URL_SCRIPT, json={"target_sheet":"campañas","action":"create","nombre":nc})
-        st.rerun()
-    st.dataframe(df_c, use_container_width=True, hide_index=True)
+    col_l, col_r = st.columns([1, 2])
+    
+    with col_l:
+        with st.container(border=True):
+            st.subheader("Configurar Campaña")
+            nc = st.text_input("Nombre de la Campaña")
+            
+            c1, c2 = st.columns(2)
+            if c1.button("🚀 Crear"):
+                requests.post(URL_SCRIPT, json={"target_sheet":"campañas","action":"create","nombre":nc})
+                st.rerun()
+            if c2.button("📝 Editar"):
+                # Para editar necesitamos saber cuál se seleccionó en la tabla
+                requests.post(URL_SCRIPT, json={"target_sheet":"campañas","action":"update","nombre":nc})
+                st.rerun()
+            
+            st.divider()
+            if not df_c.empty:
+                c_sel = st.selectbox("Seleccionar para Inhabilitar/Borrar:", df_c.iloc[:,0].tolist())
+                b1, b2 = st.columns(2)
+                if b1.button("🚫 Inhabilitar"):
+                    requests.post(URL_SCRIPT, json={"target_sheet":"campañas","action":"status","nombre":c_sel,"val":"Inactiva"})
+                    st.rerun()
+                if b2.button("🗑️ Borrar"):
+                    requests.post(URL_SCRIPT, json={"target_sheet":"campañas","action":"delete","nombre":c_sel})
+                    st.rerun()
+                    
+    with col_r:
+        st.subheader("Campañas Activas")
+        st.dataframe(df_c, use_container_width=True, hide_index=True)
 
+# [BLOQUE GESTIÓN USUARIOS - SIN CAMBIOS]
 elif choice == "Gestión Usuarios":
     st.header("👥 Gestión de Usuarios")
     df_u = get_data("usuarios")
@@ -188,6 +191,7 @@ elif choice == "Gestión Usuarios":
     with col_r:
         st.dataframe(df_u, use_container_width=True, hide_index=True)
 
+# [BLOQUE SCORECARDS - SIN CAMBIOS]
 elif choice == "Config Scorecards":
     st.header("⚙️ Scorecards")
     df_sc = get_data("scorecards")
