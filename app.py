@@ -22,7 +22,7 @@ def get_data(nombre_ho_ja="usuarios"):
     except Exception as e:
         return pd.DataFrame()
 
-# --- 2. LÓGICA DE LOGIN (SIN CAMBIOS) ---
+# --- 2. LÓGICA DE LOGIN ---
 if "autenticado" not in st.session_state:
     st.session_state["autenticado"] = False
 
@@ -69,7 +69,6 @@ if st.sidebar.button("🚪 Cerrar Sesión"):
 
 # --- 4. MÓDULOS ---
 
-# [BLOQUE DASHBOARD - SIN CAMBIOS RESPECTO AL ÚLTIMO FUNCIONAL]
 if choice == "Dashboard":
     st.header("📊 Analítica de Calidad")
     df_eval = get_data("evaluaciones")
@@ -108,7 +107,6 @@ if choice == "Dashboard":
                 fig = px.bar(df_f.groupby(df_f.columns[2])['score_final'].mean().reset_index(), x=df_f.columns[2], y='score_final', title=f"Desempeño en {sel_camp}", color='score_final', text_auto='.1f')
             st.plotly_chart(fig, use_container_width=True)
 
-# [BLOQUE EVALUADOR - SIN CAMBIOS]
 elif choice == "Evaluador":
     st.header("📝 Módulo de Evaluación")
     df_u = get_data("usuarios")
@@ -130,26 +128,21 @@ elif choice == "Evaluador":
             requests.post(URL_SCRIPT, json=payload)
             st.success("✅ Guardado")
 
-# [BLOQUE GESTIÓN CAMPAÑAS - CORREGIDO SEGÚN LO SOLICITADO]
 elif choice == "Gestión Campañas":
     st.header("📁 Administración de Campañas")
     df_c = get_data("campañas")
     col_l, col_r = st.columns([1, 2])
-    
     with col_l:
         with st.container(border=True):
             st.subheader("Configurar Campaña")
             nc = st.text_input("Nombre de la Campaña")
-            
             c1, c2 = st.columns(2)
             if c1.button("🚀 Crear"):
                 requests.post(URL_SCRIPT, json={"target_sheet":"campañas","action":"create","nombre":nc})
                 st.rerun()
             if c2.button("📝 Editar"):
-                # Para editar necesitamos saber cuál se seleccionó en la tabla
                 requests.post(URL_SCRIPT, json={"target_sheet":"campañas","action":"update","nombre":nc})
                 st.rerun()
-            
             st.divider()
             if not df_c.empty:
                 c_sel = st.selectbox("Seleccionar para Inhabilitar/Borrar:", df_c.iloc[:,0].tolist())
@@ -160,12 +153,11 @@ elif choice == "Gestión Campañas":
                 if b2.button("🗑️ Borrar"):
                     requests.post(URL_SCRIPT, json={"target_sheet":"campañas","action":"delete","nombre":c_sel})
                     st.rerun()
-                    
     with col_r:
         st.subheader("Campañas Activas")
         st.dataframe(df_c, use_container_width=True, hide_index=True)
 
-# [BLOQUE GESTIÓN USUARIOS - SIN CAMBIOS]
+# [MODIFICACIÓN ÚNICAMENTE EN GESTIÓN USUARIOS]
 elif choice == "Gestión Usuarios":
     st.header("👥 Gestión de Usuarios")
     df_u = get_data("usuarios")
@@ -176,7 +168,16 @@ elif choice == "Gestión Usuarios":
         u_nom = st.text_input("Nombre")
         u_pass = st.text_input("Password")
         u_rol = st.selectbox("Rol", ["Administrador", "Evaluador", "Agente"])
-        u_camp = st.selectbox("Campaña", df_c.iloc[:,0].tolist() if not df_c.empty else ["Todas"])
+        
+        # Lógica de Campaña: Si es Admin, añade "Todas" como opción
+        lista_c = df_c.iloc[:,0].tolist() if not df_c.empty else []
+        if u_rol == "Administrador":
+            opciones_c = ["Todas"] + lista_c
+        else:
+            opciones_c = lista_c if lista_c else ["Sin Campañas"]
+            
+        u_camp = st.selectbox("Campaña", opciones_c)
+        
         if st.button("🚀 Registrar"):
             requests.post(URL_SCRIPT, json={"target_sheet":"usuarios","action":"create","username":u_id,"nombre":u_nom,"password":u_pass,"rol":u_rol,"campaña":u_camp,"estado":"Activo"})
             st.rerun()
@@ -191,7 +192,6 @@ elif choice == "Gestión Usuarios":
     with col_r:
         st.dataframe(df_u, use_container_width=True, hide_index=True)
 
-# [BLOQUE SCORECARDS - SIN CAMBIOS]
 elif choice == "Config Scorecards":
     st.header("⚙️ Scorecards")
     df_sc = get_data("scorecards")
