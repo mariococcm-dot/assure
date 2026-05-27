@@ -186,6 +186,7 @@ elif choice == "Gestión Usuarios":
     with col_r:
         st.dataframe(df_u, use_container_width=True, hide_index=True)
 
+# --- MODIFICACIÓN EN CONFIG SCORECARDS ---
 elif choice == "Config Scorecards":
     st.header("⚙️ Scorecards")
     df_sc = get_data("scorecards")
@@ -208,28 +209,26 @@ elif choice == "Config Scorecards":
                 criterios_camp = df_sc[df_sc.iloc[:,0] == c_sc]
                 if not criterios_camp.empty:
                     item_sel = st.selectbox("Seleccionar Item:", criterios_camp.iloc[:,1].tolist())
-                    
-                    # FILA DE BOTONES DE ACCIÓN (Añadido Editar)
                     b_ed, b_inh, b_del = st.columns(3)
                     
                     if b_ed.button("📝 Editar"):
-                        requests.post(URL_SCRIPT, json={"target_sheet":"scorecards","action":"update","area":c_sc,"pregunta":item_sel,"puntos":pts_sc})
+                        # Ajustado: Enviamos 'pregunta' como identificador y 'puntos' como el valor nuevo
+                        requests.post(URL_SCRIPT, json={"target_sheet":"scorecards","action":"update","pregunta":item_sel,"puntos":pts_sc,"area":c_sc})
                         st.rerun()
                     
                     if b_inh.button("🚫 Inh."):
-                        requests.post(URL_SCRIPT, json={"target_sheet":"scorecards","action":"status","area":c_sc,"pregunta":item_sel,"val":"Inactivo"})
+                        requests.post(URL_SCRIPT, json={"target_sheet":"scorecards","action":"status","pregunta":item_sel,"val":"Inactivo","area":c_sc})
                         st.rerun()
                         
                     if b_del.button("🗑️ Del."):
-                        requests.post(URL_SCRIPT, json={"target_sheet":"scorecards","action":"delete","area":c_sc,"pregunta":item_sel})
+                        # Ajustado: Enviamos 'pregunta' que es la clave para borrar la fila en esa hoja
+                        requests.post(URL_SCRIPT, json={"target_sheet":"scorecards","action":"delete","pregunta":item_sel,"area":c_sc})
                         st.rerun()
                 else:
                     st.info("No hay items para esta campaña")
 
     with col_r:
-        st.subheader(f"Configuración: {c_sc}")
+        st.subheader(f"Configuración Actual: {c_sc}")
         if not df_sc.empty:
             df_sc_filtrado = df_sc[df_sc.iloc[:,0] == c_sc]
             st.dataframe(df_sc_filtrado, use_container_width=True, hide_index=True)
-        else:
-            st.dataframe(df_sc, use_container_width=True, hide_index=True)
