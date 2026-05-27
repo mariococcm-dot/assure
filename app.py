@@ -71,21 +71,33 @@ if st.sidebar.button("🚪 Cerrar Sesión"):
 
 # --- 4. DASHBOARD (SÓLO CORRECCIÓN DE CÁLCULO) ---
 if choice == "Dashboard":
-    st.header("📊 Dashboard")
+    st.header("📊 Dashboard de Calidad")
     df_ev = get_data("evaluaciones")
     if not df_ev.empty:
-        # Convertimos a número las columnas de puntos (usualmente col 4 y 5 en el web)
-        # Usamos fillna para evitar errores de división
-        df_ev.iloc[:, 4] = pd.to_numeric(df_ev.iloc[:, 4], errors='coerce').fillna(0)
-        df_ev.iloc[:, 5] = pd.to_numeric(df_ev.iloc[:, 5], errors='coerce').fillna(1)
+        # CREAMOS SERIES NUEVAS PARA EVITAR EL TYPEERROR
+        # Columna 4 suele ser puntos obtenidos, Columna 5 puntos máximos
+        puntos_obt = pd.to_numeric(df_ev.iloc[:, 4], errors='coerce').fillna(0)
+        puntos_max = pd.to_numeric(df_ev.iloc[:, 5], errors='coerce').fillna(1)
         
-        df_ev['score'] = (df_ev.iloc[:, 4] / df_ev.iloc[:, 5]) * 100
+        # Calculamos el Score en una columna nueva
+        df_ev['score_final'] = (puntos_obt / puntos_max) * 100
         
-        st.metric("Promedio Calidad", f"{df_ev['score'].mean():.1f}%")
-        fig = px.bar(df_ev.groupby(df_ev.columns[1])['score'].mean().reset_index(), 
-                     x=df_ev.columns[1], y='score', title="Desempeño")
+        col1, col2 = st.columns(2)
+        col1.metric("Promedio General", f"{df_ev['score_final'].mean():.1f}%")
+        col2.metric("Total Evaluaciones", len(df_ev))
+        
+        # Gráfico usando la columna de agente (Columna 1) y el score calculado
+        fig = px.bar(
+            df_ev.groupby(df_ev.columns[1])['score_final'].mean().reset_index(), 
+            x=df_ev.columns[1], 
+            y='score_final', 
+            color='score_final',
+            text_auto='.1f',
+            title="Cumplimiento por Agente"
+        )
         st.plotly_chart(fig, use_container_width=True)
-    else: st.info("No hay datos.")
+    else: 
+        st.info("No hay datos registrados en la hoja de evaluaciones.")
 
 # --- 5. EVALUADOR (IGUAL AL WEB) ---
 elif choice == "Evaluador":
