@@ -121,7 +121,10 @@ elif choice == "Evaluador":
         pregs = df_sc[df_sc.iloc[:,0] == c_sel]
         resps = {}
         for _, r in pregs.iterrows():
-            resps[r.iloc[1]] = st.select_slider(f"{r.iloc[1]}", options=[0, int(r.iloc[2])], value=int(r.iloc[2]))
+            # CAMBIO: De slider a radio Si/No
+            opcion = st.radio(f"{r.iloc[1]} ({r.iloc[2]} pts)", ["Si", "No"], horizontal=True)
+            resps[r.iloc[1]] = int(r.iloc[2]) if opcion == "Si" else 0
+            
         obs = st.text_area("Observaciones")
         if st.form_submit_button("Guardar"):
             payload = {"target_sheet": "evaluaciones", "action": "create", "fecha_registro": datetime.now().strftime("%d/%m/%Y %H:%M"), "agente": ag_sel.split(" - ")[0], "puntos_obtenidos": sum(resps.values()), "puntos_maximos": sum(pregs.iloc[:,2]), "evaluador": user['username'], "observaciones": obs, "campaña": c_sel}
@@ -184,7 +187,6 @@ elif choice == "Gestión Usuarios":
     with col_r:
         st.dataframe(df_u, use_container_width=True, hide_index=True)
 
-# [MODIFICACIÓN ÚNICAMENTE EN CONFIG SCORECARDS]
 elif choice == "Config Scorecards":
     st.header("⚙️ Scorecards")
     df_sc = get_data("scorecards")
@@ -204,22 +206,24 @@ elif choice == "Config Scorecards":
             st.divider()
             if not df_sc.empty:
                 st.subheader("Acciones")
-                # Filtramos por campaña seleccionada para que sea más fácil encontrar el item
                 criterios_camp = df_sc[df_sc.iloc[:,0] == c_sc]
                 if not criterios_camp.empty:
                     item_sel = st.selectbox("Seleccionar Item:", criterios_camp.iloc[:,1].tolist())
                     b1, b2 = st.columns(2)
                     if b1.button("🚫 Inhabilitar"):
-                        # Se envía acción de status a la hoja scorecards
                         requests.post(URL_SCRIPT, json={"target_sheet":"scorecards","action":"status","area":c_sc,"pregunta":item_sel,"val":"Inactivo"})
                         st.rerun()
                     if b2.button("🗑️ Eliminar"):
-                        # Se envía acción de delete a la hoja scorecards
                         requests.post(URL_SCRIPT, json={"target_sheet":"scorecards","action":"delete","area":c_sc,"pregunta":item_sel})
                         st.rerun()
                 else:
                     st.info("No hay items para esta campaña")
 
     with col_r:
-        st.subheader("Configuración Actual")
-        st.dataframe(df_sc, use_container_width=True, hide_index=True)
+        st.subheader(f"Configuración: {c_sc}")
+        # CAMBIO: Solo muestra preguntas de la campaña seleccionada
+        if not df_sc.empty:
+            df_sc_filtrado = df_sc[df_sc.iloc[:,0] == c_sc]
+            st.dataframe(df_sc_filtrado, use_container_width=True, hide_index=True)
+        else:
+            st.dataframe(df_sc, use_container_width=True, hide_index=True)
