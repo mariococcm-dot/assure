@@ -5,10 +5,9 @@ import plotly.express as px
 from datetime import datetime
 from urllib.parse import quote 
 
-# --- 1. CONFIGURACIÓN E INFRAESTRUCTURA ---
-st.set_page_config(page_title="QualityScore Enterprise Edition", layout="wide")
+# --- 1. CONFIGURACIÓN (IGUAL AL WEB) ---
+st.set_page_config(page_title="QualityScore Enterprise", layout="wide")
 
-# URL de tu Apps Script
 URL_SCRIPT = "https://script.google.com/macros/s/AKfycbwOzQXYSGb1aFciCb28ivzWtV9PjhITXKpacPTzpszvEoCFFcxlr5AUgn1V-g1lHyuJ/exec" 
 
 def get_data(nombre_hoja="usuarios"):
@@ -17,176 +16,157 @@ def get_data(nombre_hoja="usuarios"):
         url_final = f"{url_base}/gviz/tq?tqx=out:csv&sheet={quote(nombre_hoja)}&cache={datetime.now().timestamp()}"
         df = pd.read_csv(url_final, on_bad_lines='skip')
         if not df.empty:
-            # Normalización para evitar errores de tildes o espacios
-            df.columns = [str(c).strip().lower().replace('á','a').replace('é','e').replace('í','i').replace('ó','o').replace('ú','u') for c in df.columns]
+            df.columns = [str(c).strip().split('\n')[0].lower() for c in df.columns]
             df = df.dropna(subset=[df.columns[0]])
         return df
     except:
         return pd.DataFrame()
 
-# --- 2. LÓGICA DE SESIÓN (LOGIN) ---
+# --- 2. LOGIN (IGUAL AL WEB) ---
 if "autenticado" not in st.session_state:
     st.session_state["autenticado"] = False
 
 if not st.session_state["autenticado"]:
-    st.subheader("🔑 QualityScore Enterprise - Login")
+    st.subheader("🔑 QualityScore Login")
     u_log = st.text_input("Usuario").strip()
     p_log = st.text_input("Contraseña", type="password").strip()
     
     if st.button("Ingresar"):
-        # Acceso administrativo prioritario
         if u_log == "admin" and p_log == "admin123":
             st.session_state["autenticado"] = True
-            st.session_state["user_data"] = {"user": "admin", "nombre": "Admin Maestro", "rol": "Administrador", "campaña": "Todas"}
+            st.session_state["user_data"] = {"username": "admin", "nombre": "Administrador", "rol": "Administrador"}
             st.rerun()
         
-        # Validación con Google Sheets
         df_db = get_data("usuarios")
         if not df_db.empty:
-            # Col 0: username, Col 2: password
-            user_match = df_db[(df_db.iloc[:,0].astype(str) == u_log) & (df_db.iloc[:,2].astype(str) == p_log)]
-            if not user_match.empty:
-                row = user_match.iloc[0]
-                st.session_state["autenticado"] = True
-                st.session_state["user_data"] = {
-                    "user": str(row.iloc[0]),
-                    "nombre": str(row.iloc[1]),
-                    "rol": str(row.iloc[3]),
-                    "campaña": str(row.iloc[4])
-                }
-                st.rerun()
-            else: st.error("❌ Credenciales incorrectas")
+            # Login usando la lógica del archivo WEB (iloc[0] y iloc[2])
+            encontrado = False
+            for _, row in df_db.iterrows():
+                if str(row.iloc[0]).strip() == u_log and str(row.iloc[2]).strip() == p_log:
+                    st.session_state["autenticado"] = True
+                    st.session_state["user_data"] = {
+                        "username": str(row.iloc[0]).strip(),
+                        "nombre": str(row.iloc[1]).strip(),
+                        "rol": str(row.iloc[3]).strip()
+                    }
+                    encontrado = True
+                    break
+            if encontrado: st.rerun()
+            else: st.error("❌ Usuario o contraseña incorrectos")
     st.stop()
 
-# --- 3. BARRA LATERAL E IDENTIDAD ---
-user_data = st.session_state["user_data"]
+# --- 3. BARRA LATERAL (IGUAL AL WEB + NOMBRES LOCAL) ---
+user = st.session_state["user_data"]
 st.sidebar.title("🚀 QualityScore")
-st.sidebar.markdown(f"**ID:** `{user_data['user']}`")
-st.sidebar.markdown(f"**Nombre:** {user_data.get('nombre', 'Usuario')}")
+st.sidebar.write(f"ID: **{user['username']}**")
+st.sidebar.write(f"Nombre: **{user['nombre']}**")
 
-# Menú según archivo Local
-if user_data['rol'] == 'Administrador':
-    menu = ["Dashboard", "Evaluador", "Config Scorecards", "Gestión Campañas", "Gestión Usuarios"]
-elif user_data['rol'] == 'Evaluador':
-    menu = ["Dashboard", "Evaluador"]
-else:
-    menu = ["Mis Calificaciones"]
-
-choice = st.sidebar.selectbox("Seleccione Módulo", menu)
+menu = ["Dashboard", "Evaluador", "Gestión Campañas", "Gestión Usuarios", "Config Scorecards"] if user['rol'] == 'Administrador' else ["Dashboard", "Evaluador"]
+choice = st.sidebar.selectbox("Menú Principal", menu)
 
 if st.sidebar.button("🚪 Cerrar Sesión"):
     st.session_state["autenticado"] = False
     st.rerun()
 
-# --- 4. MÓDULOS ---
+# --- 4. MÓDULOS (ESTRUCTURA WEB CON LÓGICA LOCAL) ---
 
 if choice == "Dashboard":
-    st.header("📊 Analítica de Calidad")
-    df_eval = get_data("evaluaciones")
-    if not df_eval.empty:
-        # CORRECCIÓN DE TIPOS (Evita el error de división)
-        df_eval['puntos_obtenidos'] = pd.to_numeric(df_eval['puntos_obtenidos'], errors='coerce').fillna(0)
-        df_eval['puntos_maximos'] = pd.to_numeric(df_eval['puntos_maximos'], errors='coerce').fillna(1)
-        df_eval['% score'] = (df_eval['puntos_obtenidos'] / df_eval['puntos_maximos']) * 100
+    st.header("📊 Dashboard de Calidad")
+    df_ev = get_data("evaluaciones")
+    if not df_ev.empty:
+        # Lógica de cálculo del LOCAL adaptada a las columnas del WEB
+        df_ev['puntos_obtenidos'] = pd.to_numeric(df_ev['puntos_obtenidos'], errors='coerce').fillna(0)
+        df_ev['puntos_maximos'] = pd.to_numeric(df_ev['puntos_maximos'], errors='coerce').fillna(1)
+        df_ev['% score'] = (df_ev['puntos_obtenidos'] / df_ev['puntos_maximos']) * 100
         
-        # Filtros del archivo Local
-        c1, c2 = st.columns(2)
-        with c1:
-            camp_filtro = st.selectbox("Filtrar por Campaña:", ["Todas"] + df_eval['area'].unique().tolist())
+        col1, col2 = st.columns(2)
+        col1.metric("Promedio General", f"{df_ev['% score'].mean():.1f}%")
+        col2.metric("Total Evaluaciones", len(df_ev))
         
-        df_f = df_eval.copy()
-        if camp_filtro != "Todas":
-            df_f = df_f[df_f['area'] == camp_filtro]
-            
-        st.metric("Promedio General", f"{df_f['% score'].mean():.1f}%")
-        
-        fig = px.bar(df_f.groupby('agente')['% score'].mean().reset_index(), 
-                     x='agente', y='% score', color='% score', text_auto='.1f', title="Cumplimiento por Agente")
+        # Gráfico Plotly del LOCAL
+        fig = px.bar(df_ev.groupby('agente')['% score'].mean().reset_index(), 
+                     x='agente', y='% score', color='% score', text_auto='.1f')
         st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("Aún no hay evaluaciones registradas.")
+    else: st.info("No hay datos.")
 
 elif choice == "Evaluador":
-    st.header("📝 Nueva Evaluación")
-    df_sc = get_data("scorecards")
-    df_u = get_data("usuarios")
-    
-    with st.form("form_eval"):
-        c1, c2, c3 = st.columns(3)
-        areas = df_sc['area'].unique() if not df_sc.empty else ["General"]
-        sel_area = c1.selectbox("Campaña/Área", areas)
-        
-        # Filtro de agentes de la campaña seleccionada
-        ags = df_u[(df_u.iloc[:,3].str.lower() == 'agente') & (df_u.iloc[:,4] == sel_area)]
-        sel_agente = c2.selectbox("Agente", ags.iloc[:,1].tolist() if not ags.empty else ["Sin agentes"])
-        f_ev = c3.date_input("Fecha de la llamada/evento")
-        
-        st.divider()
-        # Scorecard dinámico según archivo Local
-        preguntas = df_sc[df_sc['area'] == sel_area]
-        respuestas = {}
-        for _, row in preguntas.iterrows():
-            respuestas[row['pregunta']] = st.select_slider(
-                f"{row['pregunta']} (Máx: {row['puntos']})",
-                options=[0, int(row['puntos'])],
-                value=int(row['puntos'])
-            )
-        
-        obs = st.text_area("Observaciones y Feedback")
-        if st.form_submit_button("💾 Guardar Evaluación"):
-            p_ob = sum(respuestas.values())
-            p_mx = sum(preguntas['puntos'])
-            payload = {
-                "target_sheet": "evaluaciones", "action": "create",
-                "fecha_registro": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                "fecha_evento": str(f_ev), "area": sel_area, "agente": sel_agente,
-                "puntos_obtenidos": p_ob, "puntos_maximos": p_mx,
-                "evaluador": user_data['user'], "observaciones": obs
-            }
-            requests.post(URL_SCRIPT, json=payload)
-            st.success(f"✅ Registrada con éxito: {(p_ob/p_mx*100):.1f}%")
-
-elif choice == "Gestión Usuarios":
-    st.header("👥 Administración de Usuarios")
+    st.header("📝 Módulo de Evaluación")
     df_u = get_data("usuarios")
     df_c = get_data("campañas")
+    df_sc = get_data("scorecards") # Traemos scorecards para la lógica local
     
-    col_form, col_view = st.columns([1, 1.5])
-    with col_form:
-        with st.container(border=True):
-            id_u = st.text_input("ID de Empleado")
-            nom_u = st.text_input("Nombre Completo")
-            pass_u = st.text_input("Password")
-            rol_u = st.selectbox("Rol", ["Administrador", "Evaluador", "Agente"])
-            camp_u = st.selectbox("Campaña Asignada", df_c.iloc[:,0].tolist() if not df_c.empty else ["General"])
-            
-            b1, b2 = st.columns(2)
-            if b1.button("🚀 Registrar Nuevo"):
-                p = {"target_sheet":"usuarios","action":"create","username":id_u,"nombre":nom_u,"password":pass_u,"rol":rol_u,"campaña":camp_u,"estado":"Activo"}
-                requests.post(URL_SCRIPT, json=p); st.rerun()
-            if b2.button("📝 Modificar Existente"):
-                p = {"target_sheet":"usuarios","action":"update","username":id_u,"nombre":nom_u,"password":pass_u,"rol":rol_u,"campaña":camp_u}
-                requests.post(URL_SCRIPT, json=p); st.rerun()
-                
-    with col_view:
+    with st.form("form_eval"):
+        c_list = df_c.iloc[:,0].tolist() if not df_c.empty else ["General"]
+        c_sel = st.selectbox("Campaña", c_list)
+        
+        ags = df_u[df_u.iloc[:,3].str.lower() == 'agente']
+        ag_list = (ags.iloc[:,0].astype(str) + " - " + ags.iloc[:,1].astype(str)).tolist()
+        ag_sel = st.selectbox("Agente", ag_list if ag_list else ["Sin agentes"])
+        
+        # Scorecard Dinámico del LOCAL
+        preguntas = df_sc[df_sc.iloc[:,0] == c_sel] if not df_sc.empty else pd.DataFrame()
+        respuestas = {}
+        for _, row in preguntas.iterrows():
+            respuestas[row.iloc[1]] = st.select_slider(f"{row.iloc[1]} (Max: {row.iloc[2]})", options=[0, int(row.iloc[2])], value=int(row.iloc[2]))
+        
+        obs = st.text_area("Observaciones")
+        
+        if st.form_submit_button("Guardar Evaluación"):
+            p_ob = sum(respuestas.values())
+            p_mx = sum(preguntas.iloc[:,2]) if not preguntas.empty else 100
+            payload = {
+                "target_sheet": "evaluaciones", "action": "create",
+                "fecha_registro": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                "agente": ag_sel.split(" - ")[0], "puntos_obtenidos": p_ob, "puntos_maximos": p_mx,
+                "evaluador": user['username'], "observaciones": obs, "campaña": c_sel
+            }
+            requests.post(URL_SCRIPT, json=payload)
+            st.success("✅ Evaluación registrada")
+
+elif choice == "Gestión Usuarios":
+    st.header("👥 Gestión de Personal")
+    df_u = get_data("usuarios")
+    df_c = get_data("campañas")
+    col_l, col_r = st.columns([1.2, 2])
+    
+    with col_l:
+        u_id = st.text_input("ID / Username")
+        u_nom = st.text_input("Nombre Completo")
+        u_pass = st.text_input("Password")
+        u_rol = st.selectbox("Rol", ["Administrador", "Evaluador", "Agente"])
+        u_camp = st.selectbox("Campaña", df_c.iloc[:,0].tolist() if not df_c.empty else ["Todas"])
+        
+        # Botones del WEB (Registrar y Modificar)
+        b1, b2 = st.columns(2)
+        if b1.button("🚀 Registrar"):
+            p = {"target_sheet":"usuarios","action":"create","username":u_id,"nombre":u_nom,"password":u_pass,"rol":u_rol,"campaña":u_camp,"estado":"Activo"}
+            requests.post(URL_SCRIPT, json=p); st.rerun()
+        if b2.button("📝 Modificar"):
+            p = {"target_sheet":"usuarios","action":"update","username":u_id,"nombre":u_nom,"password":u_pass,"rol":u_rol,"campaña":u_camp}
+            requests.post(URL_SCRIPT, json=p); st.rerun()
+
+    with col_r:
         st.dataframe(df_u, use_container_width=True, hide_index=True)
 
+# Módulos faltantes (Campañas y Scorecards) exactamente como en el WEB
 elif choice == "Gestión Campañas":
-    st.header("📁 Gestión de Campañas")
-    nc = st.text_input("Nombre de Nueva Campaña")
-    if st.button("Añadir"):
+    st.header("📁 Administración de Campañas")
+    df_c = get_data("campañas")
+    nc = st.text_input("Nombre de la Campaña")
+    if st.button("🚀 Crear Campaña"):
         requests.post(URL_SCRIPT, json={"target_sheet":"campañas","action":"create","nombre":nc})
         st.rerun()
-    st.dataframe(get_data("campañas"), use_container_width=True)
+    st.dataframe(df_c, use_container_width=True, hide_index=True)
 
 elif choice == "Config Scorecards":
     st.header("⚙️ Configuración de Scorecards")
+    df_sc = get_data("scorecards")
     df_c = get_data("campañas")
-    with st.form("form_sc"):
-        c_sc = st.selectbox("Campaña", df_c.iloc[:,0].tolist() if not df_c.empty else ["General"])
-        p_sc = st.text_input("Pregunta / Criterio")
-        v_sc = st.number_input("Puntos", 1, 100, 10)
-        if st.form_submit_button("Añadir Pregunta"):
-            requests.post(URL_SCRIPT, json={"target_sheet":"scorecards","action":"create","area":c_sc,"pregunta":p_sc,"puntos":v_sc})
+    with st.container(border=True):
+        c_sc = st.selectbox("Campaña vinculada", df_c.iloc[:,0].tolist() if not df_c.empty else ["General"])
+        preg_sc = st.text_input("Pregunta / Criterio")
+        pts_sc = st.number_input("Puntos", 1, 100, 10)
+        if st.button("➕ Añadir Criterio"):
+            requests.post(URL_SCRIPT, json={"target_sheet":"scorecards","action":"create","area":c_sc, "pregunta":preg_sc, "puntos":pts_sc})
             st.rerun()
-    st.dataframe(get_data("scorecards"), use_container_width=True)
+    st.dataframe(df_sc, use_container_width=True, hide_index=True)
