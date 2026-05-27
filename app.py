@@ -71,33 +71,80 @@ if st.sidebar.button("🚪 Cerrar Sesión"):
 
 # --- 4. DASHBOARD (SÓLO CORRECCIÓN DE CÁLCULO) ---
 if choice == "Dashboard":
-    st.header("📊 Dashboard de Calidad")
-    df_ev = get_data("evaluaciones")
-    if not df_ev.empty:
-        # CREAMOS SERIES NUEVAS PARA EVITAR EL TYPEERROR
-        # Columna 4 suele ser puntos obtenidos, Columna 5 puntos máximos
-        puntos_obt = pd.to_numeric(df_ev.iloc[:, 4], errors='coerce').fillna(0)
-        puntos_max = pd.to_numeric(df_ev.iloc[:, 5], errors='coerce').fillna(1)
+    st.header("📊 Analítica de Calidad")
+    df_eval = get_data("evaluaciones")
+    
+    if df_eval.empty:
+        st.info("Sin datos registrados aún.")
+    else:
+        # --- PREPARACIÓN DE DATOS (Lógica del Local) ---
+        # Convertimos fechas y extraemos periodos
+        df_eval['fecha_registro'] = pd.to_datetime(df_eval['fecha_registro'], errors='coerce')
+        df_eval['Año'] = df_eval['fecha_registro'].dt.year
+        df_eval['Mes_Ing'] = df_eval['fecha_registro'].dt.month_name()
         
-        # Calculamos el Score en una columna nueva
-        df_ev['score_final'] = (puntos_obt / puntos_max) * 100
+        meses_nombres = ["January", "February", "March", "April", "May", "June", 
+                          "July", "August", "September", "October", "November", "December"]
+        meses_esp = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", 
+                     "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+        dic_meses = dict(zip(meses_nombres, meses_esp))
+        df_eval['Mes'] = df_eval['Mes_Ing'].map(dic_meses)
+
+        # --- FILTROS (Estructura del Local) ---
+        col_f1, col_f2, col_f3 = st.columns(3)
+        with col_f1:
+            df_c = get_data("campañas")
+            camps = ["Ver Todas"] + (df_c.iloc[:,0].tolist() if not df_c.empty else [])
+            sel_camp = st.selectbox("Campaña:", camps)
+        with col_f2:
+            años_db = sorted(df_eval['Año'].dropna().unique().astype(int).tolist(), reverse=True)
+            if datetime.now().year not in años_db: años_db.append(datetime.now().year)
+            sel_año = st.selectbox("Año:", años_db)
+        with col_f3:
+            sel_mes = st.selectbox("Mes:", meses_esp, index=datetime.now().month - 1)
+
+        # --- PROCESAMIENTO SEGURO (Evita TypeError) ---
+        # Filtramos primero
+        df_f = df_eval[(df_eval['Año'] == sel_año) & (df_eval['Mes'] == sel_mes)].copy()
         
-        col1, col2 = st.columns(2)
-        col1.metric("Promedio General", f"{df_ev['score_final'].mean():.1f}%")
-        col2.metric("Total Evaluaciones", len(df_ev))
-        
-        # Gráfico usando la columna de agente (Columna 1) y el score calculado
-        fig = px.bar(
-            df_ev.groupby(df_ev.columns[1])['score_final'].mean().reset_index(), 
-            x=df_ev.columns[1], 
-            y='score_final', 
-            color='score_final',
-            text_auto='.1f',
-            title="Cumplimiento por Agente"
-        )
-        st.plotly_chart(fig, use_container_width=True)
-    else: 
-        st.info("No hay datos registrados en la hoja de evaluaciones.")
+        if sel_camp != "Ver Todas":
+            # En el web, 'campaña' es una de las últimas columnas, o 'area' según el mapeo
+            col_area = 'campaña' if 'campaña' in df_f.columns else 'area'
+            df_f = df_f[df_f[col_area] == sel_camp]
+
+        if df_f.empty:
+            st.warning(f"No hay datos para {sel_mes} de {sel_año}.")
+        else:
+            # Agregación para cálculo de % Final (Lógica del Local)
+            # Usamos iloc para asegurar que sumamos las columnas correctas de puntos (4 y 5)
+            df_cons = df_f.groupby(['fecha_registro', 'agente']).agg(
+                Suma_Obtenida=(df_f.columns[4], 'sum'),
+                Suma_Maxima=(df_f.columns[5], 'sum')
+            ).reset_index()
+            
+            # Convertimos a numérico antes de calcular para evitar errores
+            df_cons['Suma_Obtenida'] = pd.to_numeric(df_cons['Suma_Obtenida'], errors='coerce').fillna(0)
+            df_cons['Suma_Maxima'] = pd.to_numeric(df_cons['Suma_Maxima'], errors='coerce').fillna(1)
+            df_cons['% Final'] = (df_cons['Suma_Obtenida'] / df_cons['Suma_Maxima']) * 100
+
+            st.metric("Total de Monitoreos Realizados", len(df_cons))
+
+            # --- VISUALIZACIÓN (Estructura del Local) ---
+            if sel_camp == "Ver Todas":
+                # Promedio Global por Campaña (usando la columna de área/campaña)
+                col_area_name = 'campaña' if 'campaña' in df_f.columns else 'area'
+                fig1 = px.bar(df_f.groupby(col_area_name).apply(
+                    lambda x: (pd.to_numeric(x.iloc[:,4]).sum() / pd.to_numeric(x.iloc[:,5]).sum()) * 100
+                ).reset_index(name='% Final'), 
+                x=col_area_name, y='% Final', title="Promedio Global por Campaña",
+                color='% Final', color_continuous_scale='Blues', text_auto='.1f')
+                st.plotly_chart(fig1, use_container_width=True)
+            else:
+                # Desempeño de Asesores por Campaña Seleccionada
+                fig_a = px.bar(df_cons.groupby('agente')['% Final'].mean().reset_index(), 
+                x='agente', y='% Final', title=f"Desempeño de Asesores: {sel_camp}",
+                color='% Final', color_continuous_scale='Blues', text_auto='.1f')
+                st.plotly_chart(fig_a, use_container_width=True)
 
 # --- 5. EVALUADOR (IGUAL AL WEB) ---
 elif choice == "Evaluador":
