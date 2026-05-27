@@ -157,7 +157,6 @@ elif choice == "Gestión Campañas":
         st.subheader("Campañas Activas")
         st.dataframe(df_c, use_container_width=True, hide_index=True)
 
-# [MODIFICACIÓN ÚNICAMENTE EN GESTIÓN USUARIOS]
 elif choice == "Gestión Usuarios":
     st.header("👥 Gestión de Usuarios")
     df_u = get_data("usuarios")
@@ -168,16 +167,9 @@ elif choice == "Gestión Usuarios":
         u_nom = st.text_input("Nombre")
         u_pass = st.text_input("Password")
         u_rol = st.selectbox("Rol", ["Administrador", "Evaluador", "Agente"])
-        
-        # Lógica de Campaña: Si es Admin, añade "Todas" como opción
         lista_c = df_c.iloc[:,0].tolist() if not df_c.empty else []
-        if u_rol == "Administrador":
-            opciones_c = ["Todas"] + lista_c
-        else:
-            opciones_c = lista_c if lista_c else ["Sin Campañas"]
-            
+        opciones_c = ["Todas"] + lista_c if u_rol == "Administrador" else (lista_c if lista_c else ["Sin Campañas"])
         u_camp = st.selectbox("Campaña", opciones_c)
-        
         if st.button("🚀 Registrar"):
             requests.post(URL_SCRIPT, json={"target_sheet":"usuarios","action":"create","username":u_id,"nombre":u_nom,"password":u_pass,"rol":u_rol,"campaña":u_camp,"estado":"Activo"})
             st.rerun()
@@ -192,14 +184,42 @@ elif choice == "Gestión Usuarios":
     with col_r:
         st.dataframe(df_u, use_container_width=True, hide_index=True)
 
+# [MODIFICACIÓN ÚNICAMENTE EN CONFIG SCORECARDS]
 elif choice == "Config Scorecards":
     st.header("⚙️ Scorecards")
     df_sc = get_data("scorecards")
     df_c = get_data("campañas")
-    c_sc = st.selectbox("Campaña", df_c.iloc[:,0].tolist() if not df_c.empty else ["General"])
-    preg_sc = st.text_input("Pregunta")
-    pts_sc = st.number_input("Puntos", 1, 100, 10)
-    if st.button("➕ Añadir"):
-        requests.post(URL_SCRIPT, json={"target_sheet":"scorecards","action":"create","area":c_sc, "pregunta":preg_sc, "puntos":pts_sc})
-        st.rerun()
-    st.dataframe(df_sc, use_container_width=True, hide_index=True)
+    col_l, col_r = st.columns([1, 2])
+    
+    with col_l:
+        with st.container(border=True):
+            st.subheader("Nuevo Criterio")
+            c_sc = st.selectbox("Campaña", df_c.iloc[:,0].tolist() if not df_c.empty else ["General"])
+            preg_sc = st.text_input("Pregunta / Item")
+            pts_sc = st.number_input("Puntos", 1, 100, 10)
+            if st.button("➕ Añadir"):
+                requests.post(URL_SCRIPT, json={"target_sheet":"scorecards","action":"create","area":c_sc, "pregunta":preg_sc, "puntos":pts_sc})
+                st.rerun()
+            
+            st.divider()
+            if not df_sc.empty:
+                st.subheader("Acciones")
+                # Filtramos por campaña seleccionada para que sea más fácil encontrar el item
+                criterios_camp = df_sc[df_sc.iloc[:,0] == c_sc]
+                if not criterios_camp.empty:
+                    item_sel = st.selectbox("Seleccionar Item:", criterios_camp.iloc[:,1].tolist())
+                    b1, b2 = st.columns(2)
+                    if b1.button("🚫 Inhabilitar"):
+                        # Se envía acción de status a la hoja scorecards
+                        requests.post(URL_SCRIPT, json={"target_sheet":"scorecards","action":"status","area":c_sc,"pregunta":item_sel,"val":"Inactivo"})
+                        st.rerun()
+                    if b2.button("🗑️ Eliminar"):
+                        # Se envía acción de delete a la hoja scorecards
+                        requests.post(URL_SCRIPT, json={"target_sheet":"scorecards","action":"delete","area":c_sc,"pregunta":item_sel})
+                        st.rerun()
+                else:
+                    st.info("No hay items para esta campaña")
+
+    with col_r:
+        st.subheader("Configuración Actual")
+        st.dataframe(df_sc, use_container_width=True, hide_index=True)
