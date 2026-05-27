@@ -121,7 +121,6 @@ elif choice == "Evaluador":
         pregs = df_sc[df_sc.iloc[:,0] == c_sel]
         resps = {}
         for _, r in pregs.iterrows():
-            # CAMBIO: De slider a radio Si/No
             opcion = st.radio(f"{r.iloc[1]} ({r.iloc[2]} pts)", ["Si", "No"], horizontal=True)
             resps[r.iloc[1]] = int(r.iloc[2]) if opcion == "Si" else 0
             
@@ -195,7 +194,7 @@ elif choice == "Config Scorecards":
     
     with col_l:
         with st.container(border=True):
-            st.subheader("Nuevo Criterio")
+            st.subheader("Configurar Criterio")
             c_sc = st.selectbox("Campaña", df_c.iloc[:,0].tolist() if not df_c.empty else ["General"])
             preg_sc = st.text_input("Pregunta / Item")
             pts_sc = st.number_input("Puntos", 1, 100, 10)
@@ -209,11 +208,19 @@ elif choice == "Config Scorecards":
                 criterios_camp = df_sc[df_sc.iloc[:,0] == c_sc]
                 if not criterios_camp.empty:
                     item_sel = st.selectbox("Seleccionar Item:", criterios_camp.iloc[:,1].tolist())
-                    b1, b2 = st.columns(2)
-                    if b1.button("🚫 Inhabilitar"):
+                    
+                    # FILA DE BOTONES DE ACCIÓN (Añadido Editar)
+                    b_ed, b_inh, b_del = st.columns(3)
+                    
+                    if b_ed.button("📝 Editar"):
+                        requests.post(URL_SCRIPT, json={"target_sheet":"scorecards","action":"update","area":c_sc,"pregunta":item_sel,"puntos":pts_sc})
+                        st.rerun()
+                    
+                    if b_inh.button("🚫 Inh."):
                         requests.post(URL_SCRIPT, json={"target_sheet":"scorecards","action":"status","area":c_sc,"pregunta":item_sel,"val":"Inactivo"})
                         st.rerun()
-                    if b2.button("🗑️ Eliminar"):
+                        
+                    if b_del.button("🗑️ Del."):
                         requests.post(URL_SCRIPT, json={"target_sheet":"scorecards","action":"delete","area":c_sc,"pregunta":item_sel})
                         st.rerun()
                 else:
@@ -221,7 +228,6 @@ elif choice == "Config Scorecards":
 
     with col_r:
         st.subheader(f"Configuración: {c_sc}")
-        # CAMBIO: Solo muestra preguntas de la campaña seleccionada
         if not df_sc.empty:
             df_sc_filtrado = df_sc[df_sc.iloc[:,0] == c_sc]
             st.dataframe(df_sc_filtrado, use_container_width=True, hide_index=True)
