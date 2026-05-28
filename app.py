@@ -186,7 +186,7 @@ elif choice == "Gestión Usuarios":
     with col_r:
         st.dataframe(df_u, use_container_width=True, hide_index=True)
 
-# --- MODIFICACIÓN EN CONFIG SCORECARDS ---
+# [BLOQUE CONFIG SCORECARDS - ACTUALIZADO: ELIMINAR SCORECARD COMPLETA]
 elif choice == "Config Scorecards":
     st.header("⚙️ Scorecards")
     df_sc = get_data("scorecards")
@@ -199,34 +199,59 @@ elif choice == "Config Scorecards":
             c_sc = st.selectbox("Campaña", df_c.iloc[:,0].tolist() if not df_c.empty else ["General"])
             preg_sc = st.text_input("Pregunta / Item")
             pts_sc = st.number_input("Puntos", 1, 100, 10)
-            if st.button("➕ Añadir"):
-                requests.post(URL_SCRIPT, json={"target_sheet":"scorecards","action":"create","area":c_sc, "pregunta":preg_sc, "puntos":pts_sc})
-                st.rerun()
+            
+            if st.button("➕ Añadir Item"):
+                if preg_sc:
+                    requests.post(URL_SCRIPT, json={
+                        "target_sheet":"scorecards",
+                        "action":"create",
+                        "area":c_sc, 
+                        "pregunta":preg_sc, 
+                        "puntos":pts_sc
+                    })
+                    st.success("Item añadido")
+                    st.rerun()
             
             st.divider()
             if not df_sc.empty:
-                st.subheader("Acciones")
+                st.subheader("Gestión de Scorecard")
+                
+                # Acción 1: Eliminar Item Individual
                 criterios_camp = df_sc[df_sc.iloc[:,0] == c_sc]
                 if not criterios_camp.empty:
-                    item_sel = st.selectbox("Seleccionar Item:", criterios_camp.iloc[:,1].tolist())
-                    b_ed, b_inh, b_del = st.columns(3)
-                    
-                    if b_ed.button("📝 Editar"):
-                        # Ajustado: Enviamos 'pregunta' como identificador y 'puntos' como el valor nuevo
-                        requests.post(URL_SCRIPT, json={"target_sheet":"scorecards","action":"update","pregunta":item_sel,"puntos":pts_sc,"area":c_sc})
+                    item_sel = st.selectbox("Seleccionar Item para borrar:", criterios_camp.iloc[:,1].tolist())
+                    if st.button("🗑️ Eliminar Item Seleccionado"):
+                        requests.post(URL_SCRIPT, json={
+                            "target_sheet":"scorecards",
+                            "action":"delete",
+                            "pregunta":item_sel,
+                            "area":c_sc
+                        })
                         st.rerun()
-                    
-                    if b_inh.button("🚫 Inh."):
-                        requests.post(URL_SCRIPT, json={"target_sheet":"scorecards","action":"status","pregunta":item_sel,"val":"Inactivo","area":c_sc})
-                        st.rerun()
-                        
-                    if b_del.button("🗑️ Del."):
-                        # Ajustado: Enviamos 'pregunta' que es la clave para borrar la fila en esa hoja
-                        requests.post(URL_SCRIPT, json={"target_sheet":"scorecards","action":"delete","pregunta":item_sel,"area":c_sc})
-                        st.rerun()
-                else:
-                    st.info("No hay items para esta campaña")
+                
+                st.divider()
+                # Acción 2: ELIMINAR TODA LA SCORECARD (Acción por Campaña)
+                st.warning(f"Zona de Peligro: {c_sc}")
+                if st.button(f"🔥 Eliminar Scorecard de {c_sc}"):
+                    # Usamos una lógica de borrado masivo por 'area'
+                    # Nota: Asegúrate que tu Apps Script soporte borrar por 'area'
+                    requests.post(URL_SCRIPT, json={
+                        "target_sheet":"scorecards",
+                        "action":"delete",
+                        "area":c_sc,
+                        "modo": "completo" 
+                    })
+                    st.success(f"Scorecard de {c_sc} eliminada")
+                    st.rerun()
 
+    with col_r:
+        st.subheader(f"Configuración Actual: {c_sc}")
+        if not df_sc.empty:
+            df_sc_filtrado = df_sc[df_sc.iloc[:,0] == c_sc]
+            if not df_sc_filtrado.empty:
+                st.dataframe(df_sc_filtrado, use_container_width=True, hide_index=True)
+            else:
+                st.info("No hay preguntas configuradas para esta campaña.")
     with col_r:
         st.subheader(f"Configuración Actual: {c_sc}")
         if not df_sc.empty:
