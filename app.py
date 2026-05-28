@@ -186,7 +186,7 @@ elif choice == "Gestión Usuarios":
     with col_r:
         st.dataframe(df_u, use_container_width=True, hide_index=True)
 
-# [BLOQUE CONFIG SCORECARDS - ACTUALIZADO: ELIMINAR SCORECARD COMPLETA]
+# [BLOQUE CONFIG SCORECARDS - ELIMINACIÓN TOTAL Y LIMPIEZA DE LISTADO]
 elif choice == "Config Scorecards":
     st.header("⚙️ Scorecards")
     df_sc = get_data("scorecards")
@@ -196,7 +196,10 @@ elif choice == "Config Scorecards":
     with col_l:
         with st.container(border=True):
             st.subheader("Configurar Criterio")
-            c_sc = st.selectbox("Campaña", df_c.iloc[:,0].tolist() if not df_c.empty else ["General"])
+            # Lista de campañas actualizada
+            c_list = df_c.iloc[:,0].tolist() if not df_c.empty else ["General"]
+            c_sc = st.selectbox("Campaña", c_list)
+            
             preg_sc = st.text_input("Pregunta / Item")
             pts_sc = st.number_input("Puntos", 1, 100, 10)
             
@@ -230,18 +233,23 @@ elif choice == "Config Scorecards":
                         st.rerun()
                 
                 st.divider()
-                # Acción 2: ELIMINAR TODA LA SCORECARD (Acción por Campaña)
-                st.warning(f"Zona de Peligro: {c_sc}")
-                if st.button(f"🔥 Eliminar Scorecard de {c_sc}"):
-                    # Usamos una lógica de borrado masivo por 'area'
-                    # Nota: Asegúrate que tu Apps Script soporte borrar por 'area'
+                # Acción 2: ELIMINAR TOTAL (Scorecard + Campaña del listado)
+                st.error(f"⚠️ ELIMINAR CAMPAÑA: {c_sc}")
+                if st.button(f"🔥 Borrar '{c_sc}' por completo"):
+                    # 1. Borramos las preguntas en la hoja 'scorecards'
                     requests.post(URL_SCRIPT, json={
                         "target_sheet":"scorecards",
                         "action":"delete",
                         "area":c_sc,
                         "modo": "completo" 
                     })
-                    st.success(f"Scorecard de {c_sc} eliminada")
+                    # 2. Borramos la campaña de la hoja 'campañas' para que desaparezca del desplegable
+                    requests.post(URL_SCRIPT, json={
+                        "target_sheet":"campañas",
+                        "action":"delete",
+                        "nombre": c_sc
+                    })
+                    st.success(f"Campaña {c_sc} eliminada globalmente")
                     st.rerun()
 
     with col_r:
@@ -252,6 +260,7 @@ elif choice == "Config Scorecards":
                 st.dataframe(df_sc_filtrado, use_container_width=True, hide_index=True)
             else:
                 st.info("No hay preguntas configuradas para esta campaña.")
+    
     with col_r:
         st.subheader(f"Configuración Actual: {c_sc}")
         if not df_sc.empty:
