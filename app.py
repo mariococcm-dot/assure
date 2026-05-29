@@ -107,29 +107,64 @@ if choice == "Dashboard":
                 fig = px.bar(df_f.groupby(df_f.columns[2])['score_final'].mean().reset_index(), x=df_f.columns[2], y='score_final', title=f"Desempeño en {sel_camp}", color='score_final', text_auto='.1f')
             st.plotly_chart(fig, use_container_width=True)
 
+# [BLOQUE EVALUADOR - FILTRADO POR PERFIL DE USUARIO]
 elif choice == "Evaluador":
     st.header("📝 Módulo de Evaluación")
     df_u = get_data("usuarios")
     df_c = get_data("campañas")
     df_sc = get_data("scorecards")
+    
     with st.form("form_eval"):
-        c_list = df_c.iloc[:,0].tolist() if not df_c.empty else ["General"]
-        c_sel = st.selectbox("Campaña", c_list)
-        ags = df_u[df_u.iloc[:,3].astype(str).str.lower() == 'agente']
+        # --- LÓGICA DE FILTRADO DE CAMPAÑA SEGÚN EL USUARIO ---
+        lista_c_completa = df_c.iloc[:,0].tolist() if not df_c.empty else ["General"]
+        
+        # Si el usuario tiene una campaña asignada y no es "Todas"
+        if user['campaña'] != "Todas":
+            c_opciones = [user['campaña']]
+        else:
+            c_opciones = lista_c_completa
+            
+        c_sel = st.selectbox("Campaña", c_opciones)
+        # -----------------------------------------------------
+
+        # Filtrar agentes por la campaña seleccionada
+        ags = df_u[(df_u.iloc[:,3].astype(str).str.lower() == 'agente') & (df_u.iloc[:,4] == c_sel)]
         ag_list = (ags.iloc[:,0].astype(str) + " - " + ags.iloc[:,1].astype(str)).tolist()
-        ag_sel = st.selectbox("Agente", ag_list if ag_list else ["Sin agentes"])
+        ag_sel = st.selectbox("Agente", ag_list if ag_list else ["Sin agentes en esta campaña"])
+        
+        # Cargar preguntas de la scorecard de esa campaña
         pregs = df_sc[df_sc.iloc[:,0] == c_sel]
         resps = {}
-        for _, r in pregs.iterrows():
-            opcion = st.radio(f"{r.iloc[1]} ({r.iloc[2]} pts)", ["Si", "No"], horizontal=True)
-            resps[r.iloc[1]] = int(r.iloc[2]) if opcion == "Si" else 0
+        
+        if pregs.empty:
+            st.info(f"No hay preguntas configuradas para {c_sel}")
+        else:
+            for _, r in pregs.iterrows():
+                opcion = st.radio(f"{r.iloc[1]} ({r.iloc[2]} pts)", ["Si", "No"], horizontal=True)
+                resps[r.iloc[1]] = int(r.iloc[2]) if opcion == "Si" else 0
             
         obs = st.text_area("Observaciones")
-        if st.form_submit_button("Guardar"):
-            payload = {"target_sheet": "evaluaciones", "action": "create", "fecha_registro": datetime.now().strftime("%d/%m/%Y %H:%M"), "agente": ag_sel.split(" - ")[0], "puntos_obtenidos": sum(resps.values()), "puntos_maximos": sum(pregs.iloc[:,2]), "evaluador": user['username'], "observaciones": obs, "campaña": c_sel}
-            requests.post(URL_SCRIPT, json=payload)
-            st.success("✅ Guardado")
-
+        
+        if st.form_submit_button("Guardar Evaluación"):
+            if not ag_list or "Sin agentes" in ag_sel:
+                st.error("No puedes guardar sin un agente válido.")
+            elif pregs.empty:
+                st.error("No hay preguntas para evaluar.")
+            else:
+                payload = {
+                    "target_sheet": "evaluaciones", 
+                    "action": "create", 
+                    "fecha_registro": datetime.now().strftime("%d/%m/%Y %H:%M"), 
+                    "agente": ag_sel.split(" - ")[0], 
+                    "puntos_obtenidos": sum(resps.values()), 
+                    "puntos_maximos": sum(pregs.iloc[:,2]), 
+                    "evaluador": user['username'], 
+                    "observaciones": obs, 
+                    "campaña": c_sel
+                }
+                requests.post(URL_SCRIPT, json=payload)
+                st.success("✅ Evaluación guardada correctamente")
+                
 elif choice == "Gestión Campañas":
     st.header("📁 Administración de Campañas")
     df_c = get_data("campañas")
