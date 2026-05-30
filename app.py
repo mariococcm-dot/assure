@@ -82,7 +82,6 @@ if choice == "Dashboard":
         if df_eval.empty:
             st.info("Sin datos registrados aún.")
         else:
-            # 1. Procesamiento de tiempos
             df_eval['fecha_dt'] = pd.to_datetime(df_eval.iloc[:, 0], errors='coerce')
             df_eval['año_f'] = df_eval['fecha_dt'].dt.year
             df_eval['mes_n'] = df_eval['fecha_dt'].dt.month_name()
@@ -92,14 +91,10 @@ if choice == "Dashboard":
             df_eval['mes_f'] = df_eval['mes_n'].map(dic_meses)
             
             col_f1, col_f2, col_f3 = st.columns(3)
-            
             with col_f1:
-                # --- MEJORA DE SEGURIDAD POR ROL ---
                 if user['rol'] in ['Evaluador', 'Agente']:
-                    # Si no es Admin, solo ve SU campaña asignada y el selector queda bloqueado
                     sel_camp = st.selectbox("Campaña:", [user['campaña']], disabled=True)
                 else:
-                    # Solo el Admin puede "Ver Todas"
                     df_c_list = get_data("campañas")
                     camps = ["Ver Todas"] + (df_c_list.iloc[:,0].tolist() if not df_c_list.empty else [])
                     sel_camp = st.selectbox("Campaña:", camps)
@@ -110,56 +105,65 @@ if choice == "Dashboard":
             with col_f3:
                 sel_mes = st.selectbox("Mes:", meses_esp, index=datetime.now().month - 1)
                 
-            # 2. Aplicación de Filtros
             df_f = df_eval[(df_eval['año_f'] == sel_año) & (df_eval['mes_f'] == sel_mes)].copy()
-            
             if sel_camp != "Ver Todas":
                 df_f = df_f[df_f.iloc[:, 1] == sel_camp]
-            
-            # Filtro adicional si es Agente (Solo se ve a sí mismo)
             if user['rol'] == 'Agente':
                 df_f = df_f[df_f.iloc[:, 2] == user['username']]
                 
             if df_f.empty:
-                st.warning(f"No hay datos para la campaña {sel_camp} en {sel_mes} de {sel_año}.")
+                st.warning(f"No hay datos para {sel_mes} de {sel_año}.")
             else:
                 df_f['p_obt'] = pd.to_numeric(df_f.iloc[:, 4], errors='coerce').fillna(0)
                 df_f['p_max'] = pd.to_numeric(df_f.iloc[:, 5], errors='coerce').fillna(1)
                 df_f['score_final'] = (df_f['p_obt'] / df_f['p_max']) * 100
+                promedio_actual = df_f['score_final'].mean()
                 
-                # 3. Vista de Métricas
-                promedio_ver = df_f['score_final'].mean()
-                st.metric(f"Resultado {sel_camp}", f"{promedio_ver:.1f}%", f"{len(df_f)} Monitoreos")
-
-                # --- VISTA DETALLADA PARA AGENTE ---
+                st.metric("Total Monitoreos", len(df_f), f"{promedio_actual:.1f}% Promedio")
+                
+                # --- GRÁFICA 1: DESEMPEÑO (CAMPOS O AGENTES) ---
+                if sel_camp == "Ver Todas":
+                    fig = px.bar(df_f.groupby(df_f.columns[1])['score_final'].mean().reset_index(), 
+                                 x=df_f.columns[1], y='score_final', 
+                                 title="Promedio Global por Campaña", text_auto='.1f',
+                                 color='score_final', color_continuous_scale=['#D3D3D3', '#1F77B4'])
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    # El Evaluador y el Admin ven aquí la comparativa de Agentes
+                    fig_ag = px.bar(df_f.groupby(df_f.columns[2])['score_final'].mean().reset_index(), 
+                                 x=df_f.columns[2], y='score_final', 
+                                 title=f"Desempeño de Agentes en {sel_camp}", text_auto='.1f',
+                                 color='score_final', color_continuous_scale=['#D3D3D3', '#1F77B4'])
+                    st.plotly_chart(fig_ag, use_container_width=True)
+                
+                # --- COMENTARIOS (SOLO AGENTE) ---
                 if user['rol'] == 'Agente':
-                    with st.expander("🔍 Ver detalle de mis evaluaciones", expanded=True):
+                    with st.expander("💬 Ver detalle de mis evaluaciones", expanded=True):
                         eval_options = df_f.apply(lambda r: f"Fecha: {r.iloc[0]} | Score: {((r.iloc[4]/r.iloc[5])*100):.1f}%", axis=1).tolist()
                         sel_idx = st.selectbox("Selecciona una auditoría:", range(len(eval_options)), format_func=lambda x: eval_options[x])
                         row_sel = df_f.iloc[sel_idx]
-                        st.info(f"**Comentarios del Evaluador ({row_sel.iloc[6]}):**\n\n{row_sel.iloc[7]}")
+                        st.info(f"**Evaluador:** {row_sel.iloc[6]}\n\n**Comentarios:** {row_sel.iloc[7]}")
 
-                # --- GRÁFICA BINARIA (CUMPLIMIENTO) ---
+                # --- GRÁFICA 2: ATRIBUTOS (BINARIA) ---
                 st.divider()
-                st.subheader("✅ Cumplimiento por Atributo")
+                st.subheader(f"🔍 Cumplimiento Scorecard: {sel_camp if sel_camp != 'Ver Todas' else 'Global'}")
                 
                 df_sc = get_data("scorecards")
-                # Buscamos el scorecard de la campaña seleccionada
                 camp_ref = sel_camp if sel_camp != "Ver Todas" else (df_f.iloc[0,1] if not df_f.empty else "")
                 pregs_camp = df_sc[df_sc.iloc[:,0] == camp_ref].copy()
                 
                 if not pregs_camp.empty:
-                    # Lógica binaria: si el promedio bajó, restamos los puntos del atributo
                     def calcular_binario(row):
                         peso = row.iloc[2]
-                        if promedio_ver < 100 and (100 - promedio_ver) >= (peso / 2):
+                        if promedio_actual < 100 and (100 - promedio_actual) >= (peso / 2):
                             return 0
                         return peso
 
                     pregs_camp['Resultado'] = pregs_camp.apply(calcular_binario, axis=1)
                     fig_items = px.bar(pregs_camp, x='Resultado', y=pregs_camp.columns[1], 
-                                       orientation='h', text_auto='.1f',
-                                       color='Resultado', color_continuous_scale=['#D3D3D3', '#1F77B4'])
+                                       orientation='h', title="Detalle por Atributo (Puntos)",
+                                       text_auto='.1f', color='Resultado',
+                                       color_continuous_scale=[(0, '#D3D3D3'), (1, '#1F77B4')])
                     fig_items.update_layout(coloraxis_showscale=False)
                     st.plotly_chart(fig_items, use_container_width=True)
                     
