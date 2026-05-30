@@ -82,7 +82,7 @@ if choice == "Dashboard":
         if df_eval.empty:
             st.info("Sin datos registrados aún.")
         else:
-            # Procesamiento de fechas
+            # 1. Procesamiento de tiempos
             df_eval['fecha_dt'] = pd.to_datetime(df_eval.iloc[:, 0], errors='coerce')
             df_eval['año_f'] = df_eval['fecha_dt'].dt.year
             df_eval['mes_n'] = df_eval['fecha_dt'].dt.month_name()
@@ -92,10 +92,14 @@ if choice == "Dashboard":
             df_eval['mes_f'] = df_eval['mes_n'].map(dic_meses)
             
             col_f1, col_f2, col_f3 = st.columns(3)
+            
             with col_f1:
-                if user['rol'] == 'Agente':
+                # --- MEJORA DE SEGURIDAD POR ROL ---
+                if user['rol'] in ['Evaluador', 'Agente']:
+                    # Si no es Admin, solo ve SU campaña asignada y el selector queda bloqueado
                     sel_camp = st.selectbox("Campaña:", [user['campaña']], disabled=True)
                 else:
+                    # Solo el Admin puede "Ver Todas"
                     df_c_list = get_data("campañas")
                     camps = ["Ver Todas"] + (df_c_list.iloc[:,0].tolist() if not df_c_list.empty else [])
                     sel_camp = st.selectbox("Campaña:", camps)
@@ -106,74 +110,59 @@ if choice == "Dashboard":
             with col_f3:
                 sel_mes = st.selectbox("Mes:", meses_esp, index=datetime.now().month - 1)
                 
-            # Filtrado base
+            # 2. Aplicación de Filtros
             df_f = df_eval[(df_eval['año_f'] == sel_año) & (df_eval['mes_f'] == sel_mes)].copy()
+            
             if sel_camp != "Ver Todas":
                 df_f = df_f[df_f.iloc[:, 1] == sel_camp]
+            
+            # Filtro adicional si es Agente (Solo se ve a sí mismo)
             if user['rol'] == 'Agente':
                 df_f = df_f[df_f.iloc[:, 2] == user['username']]
                 
             if df_f.empty:
-                st.warning(f"No hay datos para {sel_mes} de {sel_año}.")
+                st.warning(f"No hay datos para la campaña {sel_camp} en {sel_mes} de {sel_año}.")
             else:
                 df_f['p_obt'] = pd.to_numeric(df_f.iloc[:, 4], errors='coerce').fillna(0)
                 df_f['p_max'] = pd.to_numeric(df_f.iloc[:, 5], errors='coerce').fillna(1)
                 df_f['score_final'] = (df_f['p_obt'] / df_f['p_max']) * 100
                 
-                # --- VISTA ESPECÍFICA PARA AGENTE (SELECTOR DE EVALUACIÓN) ---
-                if user['rol'] == 'Agente':
-                    st.subheader("📋 Mis Evaluaciones Detalladas")
-                    # Crear una lista de opciones con la fecha para que el agente elija
-                    eval_options = df_f.apply(lambda r: f"Fecha: {r.iloc[0]} | Score: {((r.iloc[4]/r.iloc[5])*100):.1f}%", axis=1).tolist()
-                    sel_eval_idx = st.selectbox("Selecciona una evaluación para ver detalle:", range(len(eval_options)), format_func=lambda x: eval_options[x])
-                    
-                    # Extraer la evaluación seleccionada
-                    row_sel = df_f.iloc[sel_eval_idx]
-                    promedio_ver = (row_sel.iloc[4] / row_sel.iloc[5]) * 100
-                    
-                    col_m1, col_m2 = st.columns(2)
-                    col_m1.metric("Puntaje Obtenido", f"{promedio_ver:.1f}%")
-                    col_m2.write(f"**Evaluador:** {row_sel.iloc[6]}")
-                    
-                    with st.expander("💬 Ver Retroalimentación y Observaciones", expanded=True):
-                        st.info(row_sel.iloc[7] if str(row_sel.iloc[7]) != "nan" else "Sin observaciones registradas.")
-                else:
-                    # Vista Administrador/Evaluador: Promedio General
-                    promedio_ver = df_f['score_final'].mean()
-                    st.metric("Total Monitoreos", len(df_f), f"{promedio_ver:.1f}% Promedio")
+                # 3. Vista de Métricas
+                promedio_ver = df_f['score_final'].mean()
+                st.metric(f"Resultado {sel_camp}", f"{promedio_ver:.1f}%", f"{len(df_f)} Monitoreos")
 
-                # --- GRÁFICA BINARIA ---
+                # --- VISTA DETALLADA PARA AGENTE ---
+                if user['rol'] == 'Agente':
+                    with st.expander("🔍 Ver detalle de mis evaluaciones", expanded=True):
+                        eval_options = df_f.apply(lambda r: f"Fecha: {r.iloc[0]} | Score: {((r.iloc[4]/r.iloc[5])*100):.1f}%", axis=1).tolist()
+                        sel_idx = st.selectbox("Selecciona una auditoría:", range(len(eval_options)), format_func=lambda x: eval_options[x])
+                        row_sel = df_f.iloc[sel_idx]
+                        st.info(f"**Comentarios del Evaluador ({row_sel.iloc[6]}):**\n\n{row_sel.iloc[7]}")
+
+                # --- GRÁFICA BINARIA (CUMPLIMIENTO) ---
                 st.divider()
-                st.subheader(f"🔍 Cumplimiento por Atributo: {sel_camp if sel_camp != 'Ver Todas' else 'Global'}")
+                st.subheader("✅ Cumplimiento por Atributo")
                 
                 df_sc = get_data("scorecards")
-                # Si estamos en "Ver Todas" usamos una campaña genérica o la primera encontrada para la estructura
+                # Buscamos el scorecard de la campaña seleccionada
                 camp_ref = sel_camp if sel_camp != "Ver Todas" else (df_f.iloc[0,1] if not df_f.empty else "")
                 pregs_camp = df_sc[df_sc.iloc[:,0] == camp_ref].copy()
                 
                 if not pregs_camp.empty:
-                    # LÓGICA BINARIA: Si el promedio es menor al 100%, calculamos qué items se "apagan"
+                    # Lógica binaria: si el promedio bajó, restamos los puntos del atributo
                     def calcular_binario(row):
                         peso = row.iloc[2]
-                        # Si el promedio es menor a 100 y la diferencia alcanza para este item, se muestra gris (0)
-                        if promedio_ver < 100 and (100 - promedio_ver) >= (peso / 2): # Tolerancia de mitad de peso
+                        if promedio_ver < 100 and (100 - promedio_ver) >= (peso / 2):
                             return 0
                         return peso
 
                     pregs_camp['Resultado'] = pregs_camp.apply(calcular_binario, axis=1)
-
-                    fig_items = px.bar(pregs_camp, 
-                                       x='Resultado', y=pregs_camp.columns[1], 
-                                       orientation='h', 
-                                       title="Detalle de Cumplimiento (Puntos Reales)",
-                                       text_auto='.1f',
-                                       color='Resultado', 
-                                       color_continuous_scale=['#D3D3D3', '#1F77B4'])
+                    fig_items = px.bar(pregs_camp, x='Resultado', y=pregs_camp.columns[1], 
+                                       orientation='h', text_auto='.1f',
+                                       color='Resultado', color_continuous_scale=['#D3D3D3', '#1F77B4'])
                     fig_items.update_layout(coloraxis_showscale=False)
                     st.plotly_chart(fig_items, use_container_width=True)
-                else:
-                    st.info("Configura el Scorecard en el menú correspondiente para ver este análisis.")
-
+                    
 elif choice == "Evaluador":
         st.header("📝 Módulo de Evaluación")
         df_u = get_data("usuarios")
