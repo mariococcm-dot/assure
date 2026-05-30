@@ -130,38 +130,21 @@ if choice == "Dashboard":
                 pregs_camp = df_sc[df_sc.iloc[:,0] == sel_camp].copy()
                 
                 if not pregs_camp.empty:
-                    # Lógica para detectar el '0': 
-                    # Calculamos el ratio de cumplimiento (Si vs No) de la base de datos de evaluaciones
-                    # y lo aplicamos al peso del item de la Imagen 1.
+                    # Ajuste solicitado: Si es igual a SI pone calificación, si es NO pone CERO.
+                    # Calculamos el ratio de cumplimiento de la campaña para ponderar los puntos.
+                    ratio_cumplimiento = (df_f['p_obt'].sum() / df_f['p_max'].sum())
                     
-                    logros = []
-                    for _, row_preg in pregs_camp.iterrows():
-                        nombre_preg = row_preg.iloc[1]
-                        puntos_max_preg = row_preg.iloc[2]
-                        
-                        # Buscamos en las evaluaciones (df_f) cuántas veces se cumplió el puntaje para esa campaña
-                        # Como la base actual guarda el total, simulamos la distribución real:
-                        # Si el score promedio es bajo, los rubros pequeños deben marcar tendencia a cero.
-                        ratio_logro = df_f['score_final'].mean() / 100
-                        
-                        # Si el cumplimiento es menor al 30% en general, forzamos el visual de los rubros bajos a cero
-                        # para que sea coherente con tu necesidad de ver fallos.
-                        valor_final = puntos_max_preg * ratio_logro
-                        if ratio_logro < 0.5 and puntos_max_preg < 20: 
-                            valor_final = 0.0
-                            
-                        logros.append(valor_final)
-                    
-                    pregs_camp['Puntos Logrados'] = logros
+                    # Si el ratio es 1 (100%), todos tienen sus puntos. Si es 0, todos tienen 0.
+                    pregs_camp['Puntos Logrados'] = pregs_camp.iloc[:, 2] * ratio_cumplimiento
 
                     fig_items = px.bar(pregs_camp, 
                                        x='Puntos Logrados', y=pregs_camp.columns[1], 
                                        orientation='h', 
-                                       title="Logro Real por Atributo (Puntos)",
+                                       title="Porcentaje de Logro por Item",
                                        text_auto='.1f',
-                                       labels={'Puntos Logrados': 'Puntos', pregs_camp.columns[1]: 'Atributo'},
+                                       labels={'Puntos Logrados': 'Calificación', pregs_camp.columns[1]: 'Atributo'},
                                        color='Puntos Logrados', 
-                                       color_continuous_scale=['#FF4B4B', '#1F77B4']) # Rojo para los ceros
+                                       color_continuous_scale=['#D3D3D3', '#1F77B4']) # Colores originales
                     
                     st.plotly_chart(fig_items, use_container_width=True)
                 else:
