@@ -55,12 +55,19 @@ if not st.session_state["autenticado"]:
             else: st.error("❌ Usuario o contraseña incorrectos")
     st.stop()
 
-# --- 3. BARRA LATERAL ---
+# --- 3. BARRA LATERAL (AJUSTADA PARA AGENTES) ---
 user = st.session_state["user_data"]
 st.sidebar.title("🚀 QualityScore")
 st.sidebar.write(f"Bienvenido: **{user['nombre']}**")
 
-menu = ["Dashboard", "Evaluador", "Gestión Campañas", "Gestión Usuarios", "Config Scorecards"] if user['rol'] == 'Administrador' else ["Dashboard", "Evaluador"]
+# Definición de menú por Rol
+if user['rol'] == 'Administrador':
+    menu = ["Dashboard", "Evaluador", "Gestión Campañas", "Gestión Usuarios", "Config Scorecards"]
+elif user['rol'] == 'Evaluador':
+    menu = ["Dashboard", "Evaluador"]
+else: # Rol Agente
+    menu = ["Dashboard"]
+
 choice = st.sidebar.selectbox("Menú Principal", menu)
 
 if st.sidebar.button("🚪 Cerrar Sesión"):
@@ -85,7 +92,6 @@ if choice == "Dashboard":
         
         col_f1, col_f2, col_f3 = st.columns(3)
         with col_f1:
-            # AJUSTE PARA AGENTE: Bloqueo de campaña
             if user['rol'] == 'Agente':
                 sel_camp = st.selectbox("Campaña:", [user['campaña']], disabled=True)
             else:
@@ -104,7 +110,6 @@ if choice == "Dashboard":
         if sel_camp != "Ver Todas":
             df_f = df_f[df_f.iloc[:, 1] == sel_camp]
         
-        # AJUSTE PARA AGENTE: Solo ve sus propios registros
         if user['rol'] == 'Agente':
             df_f = df_f[df_f.iloc[:, 2] == user['username']]
             
@@ -252,6 +257,7 @@ elif choice == "Gestión Campañas":
         st.dataframe(df_c, use_container_width=True, hide_index=True)
 
 elif choice == "Gestión Usuarios":
+    # ... (Resto de módulos sin cambios)
     st.header("👥 Gestión de Usuarios")
     df_u = get_data("usuarios")
     df_c = get_data("campañas")
