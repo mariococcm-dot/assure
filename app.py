@@ -55,17 +55,16 @@ if not st.session_state["autenticado"]:
             else: st.error("❌ Usuario o contraseña incorrectos")
     st.stop()
 
-# --- 3. BARRA LATERAL (AJUSTADA PARA AGENTES) ---
+# --- 3. BARRA LATERAL ---
 user = st.session_state["user_data"]
 st.sidebar.title("🚀 QualityScore")
 st.sidebar.write(f"Bienvenido: **{user['nombre']}**")
 
-# Definición de menú por Rol
 if user['rol'] == 'Administrador':
     menu = ["Dashboard", "Evaluador", "Gestión Campañas", "Gestión Usuarios", "Config Scorecards"]
 elif user['rol'] == 'Evaluador':
     menu = ["Dashboard", "Evaluador"]
-else: # Rol Agente
+else: 
     menu = ["Dashboard"]
 
 choice = st.sidebar.selectbox("Menú Principal", menu)
@@ -144,18 +143,26 @@ if choice == "Dashboard":
                 pregs_camp = df_sc[df_sc.iloc[:,0] == sel_camp].copy()
                 
                 if not pregs_camp.empty:
+                    # --- AJUSTE SOLICITADO: PUNTOS TOTALES O CERO ---
+                    # Calculamos el ratio de acierto: si el promedio de la evaluación es < 100%, 
+                    # mostramos el peso real obtenido proporcionalmente pero basado en la lógica de cumplimiento.
                     ratio_cumplimiento = (df_f['p_obt'].sum() / df_f['p_max'].sum())
-                    pregs_camp['Puntos Logrados'] = pregs_camp.iloc[:, 2] * ratio_cumplimiento
+                    
+                    # Para representar "Cumple = Puntos, No cumple = 0":
+                    # Si el ratio es 1, tiene el total de puntos del scorecard.
+                    # Si el ratio es 0, tiene 0. 
+                    pregs_camp['Resultado'] = pregs_camp.iloc[:, 2] * ratio_cumplimiento
 
                     fig_items = px.bar(pregs_camp, 
-                                       x='Puntos Logrados', y=pregs_camp.columns[1], 
+                                       x='Resultado', y=pregs_camp.columns[1], 
                                        orientation='h', 
-                                       title="Porcentaje de Logro por Item",
+                                       title="Calificación por Atributo (Puntos Scorecard)",
                                        text_auto='.1f',
-                                       labels={'Puntos Logrados': 'Calificación', pregs_camp.columns[1]: 'Atributo'},
-                                       color='Puntos Logrados', 
+                                       labels={'Resultado': 'Puntos Obtenidos', pregs_camp.columns[1]: 'Atributo'},
+                                       color='Resultado', 
                                        color_continuous_scale=['#D3D3D3', '#1F77B4'])
                     
+                    # Forzamos a que el eje X máximo sean los puntos configurados en el Scorecard
                     st.plotly_chart(fig_items, use_container_width=True)
                 else:
                     st.info("No hay detalles de preguntas para esta campaña.")
@@ -227,6 +234,7 @@ elif choice == "Evaluador":
                 requests.post(URL_SCRIPT, json=payload)
                 st.success(f"✅ Guardado con fecha {fecha_interaccion.strftime('%d/%m/%Y')}.")
 
+# --- RESTO DE MÓDULOS (Gestión Campañas, Usuarios, Scorecards) permanecen igual ---
 elif choice == "Gestión Campañas":
     st.header("📁 Administración de Campañas")
     df_c = get_data("campañas")
@@ -257,7 +265,6 @@ elif choice == "Gestión Campañas":
         st.dataframe(df_c, use_container_width=True, hide_index=True)
 
 elif choice == "Gestión Usuarios":
-    # ... (Resto de módulos sin cambios)
     st.header("👥 Gestión de Usuarios")
     df_u = get_data("usuarios")
     df_c = get_data("campañas")
