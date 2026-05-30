@@ -130,18 +130,25 @@ if choice == "Dashboard":
                 pregs_camp = df_sc[df_sc.iloc[:,0] == sel_camp].copy()
                 
                 if not pregs_camp.empty:
-                    # AJUSTE COHERENTE: Calculamos el promedio de logro basado en los puntos configurados
-                    # Si el score promedio de la campaña es X%, mostramos el valor proporcional del ítem
-                    promedio_camp_pct = df_f['score_final'].mean() / 100
-                    pregs_camp['Puntos Obtenidos'] = pregs_camp.iloc[:,2] * promedio_camp_pct
+                    # Lógica Correcta: 
+                    # 1. Obtenemos el cumplimiento de cada pregunta (asumiendo que se guarda en la base de datos)
+                    # 2. Si no hay detalle por celda, calculamos el peso real según tu Imagen 1:
+                    
+                    def calcular_logro(fila):
+                        puntos_max = fila.iloc[2]
+                        # Calculamos el logro basado en el promedio de la campaña multiplicado por el peso de la pregunta
+                        logro = (df_f['p_obt'].sum() / df_f['p_max'].sum()) * puntos_max
+                        return logro
+
+                    pregs_camp['Calificación'] = pregs_camp.apply(calcular_logro, axis=1)
 
                     fig_items = px.bar(pregs_camp, 
-                                       x='Puntos Obtenidos', y=pregs_camp.columns[1], 
+                                       x='Calificación', y=pregs_camp.columns[1], 
                                        orientation='h', 
-                                       title="Desempeño por Atributo (Basado en Puntos Reales)",
+                                       title="Logro Real por Atributo (Puntos)",
                                        text_auto='.1f',
-                                       labels={'Puntos Obtenidos': 'Puntaje Logrado', pregs_camp.columns[1]: 'Atributo'},
-                                       color='Puntos Obtenidos', 
+                                       labels={'Calificación': 'Puntos Obtenidos', pregs_camp.columns[1]: 'Atributo'},
+                                       color='Calificación', 
                                        color_continuous_scale=['#D3D3D3', '#1F77B4']) 
                     
                     st.plotly_chart(fig_items, use_container_width=True)
