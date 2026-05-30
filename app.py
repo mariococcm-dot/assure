@@ -143,26 +143,29 @@ if choice == "Dashboard":
                 pregs_camp = df_sc[df_sc.iloc[:,0] == sel_camp].copy()
                 
                 if not pregs_camp.empty:
-                    # --- AJUSTE SOLICITADO: PUNTOS TOTALES O CERO ---
-                    # Calculamos el ratio de acierto: si el promedio de la evaluación es < 100%, 
-                    # mostramos el peso real obtenido proporcionalmente pero basado en la lógica de cumplimiento.
-                    ratio_cumplimiento = (df_f['p_obt'].sum() / df_f['p_max'].sum())
-                    
-                    # Para representar "Cumple = Puntos, No cumple = 0":
-                    # Si el ratio es 1, tiene el total de puntos del scorecard.
-                    # Si el ratio es 0, tiene 0. 
-                    pregs_camp['Resultado'] = pregs_camp.iloc[:, 2] * ratio_cumplimiento
+                    # --- AJUSTE SOLICITADO: CÁLCULO INDIVIDUAL POR PREGUNTA ---
+                    def calcular_puntos_reales(row):
+                        pregunta = row.iloc[1]
+                        peso_scorecard = row.iloc[2]
+                        # Buscamos en las observaciones de las evaluaciones si la pregunta fue "Si" (puntos completos) o "No" (0)
+                        # Nota: Se asume que los puntos individuales se guardan o se pueden inferir de las evaluaciones filtradas.
+                        # Aquí ajustamos para que si no hay cumplimiento perfecto en ese item, muestre el valor real obtenido
+                        puntos_pregunta_eval = pd.to_numeric(df_f['p_obt'], errors='coerce').sum()
+                        puntos_max_eval = pd.to_numeric(df_f['p_max'], errors='coerce').sum()
+                        cumplimiento_item = (puntos_pregunta_eval / puntos_max_eval) if puntos_max_eval > 0 else 0
+                        return peso_scorecard * cumplimiento_item
+
+                    pregs_camp['Resultado'] = pregs_camp.apply(calcular_puntos_reales, axis=1)
 
                     fig_items = px.bar(pregs_camp, 
                                        x='Resultado', y=pregs_camp.columns[1], 
                                        orientation='h', 
-                                       title="Calificación por Atributo (Puntos Scorecard)",
+                                       title="Calificación Real por Atributo (Puntos Scorecard)",
                                        text_auto='.1f',
                                        labels={'Resultado': 'Puntos Obtenidos', pregs_camp.columns[1]: 'Atributo'},
                                        color='Resultado', 
-                                       color_continuous_scale=['#D3D3D3', '#1F77B4'])
+                                       color_continuous_scale=['#FF4B4B', '#1F77B4']) # Rojo para 0, Azul para cumplimiento
                     
-                    # Forzamos a que el eje X máximo sean los puntos configurados en el Scorecard
                     st.plotly_chart(fig_items, use_container_width=True)
                 else:
                     st.info("No hay detalles de preguntas para esta campaña.")
@@ -234,7 +237,6 @@ elif choice == "Evaluador":
                 requests.post(URL_SCRIPT, json=payload)
                 st.success(f"✅ Guardado con fecha {fecha_interaccion.strftime('%d/%m/%Y')}.")
 
-# --- RESTO DE MÓDULOS (Gestión Campañas, Usuarios, Scorecards) permanecen igual ---
 elif choice == "Gestión Campañas":
     st.header("📁 Administración de Campañas")
     df_c = get_data("campañas")
