@@ -85,9 +85,14 @@ if choice == "Dashboard":
         
         col_f1, col_f2, col_f3 = st.columns(3)
         with col_f1:
-            df_c_list = get_data("campañas")
-            camps = ["Ver Todas"] + (df_c_list.iloc[:,0].tolist() if not df_c_list.empty else [])
-            sel_camp = st.selectbox("Campaña:", camps)
+            # AJUSTE PARA AGENTE: Bloqueo de campaña
+            if user['rol'] == 'Agente':
+                sel_camp = st.selectbox("Campaña:", [user['campaña']], disabled=True)
+            else:
+                df_c_list = get_data("campañas")
+                camps = ["Ver Todas"] + (df_c_list.iloc[:,0].tolist() if not df_c_list.empty else [])
+                sel_camp = st.selectbox("Campaña:", camps)
+        
         with col_f2:
             años_db = sorted(df_eval['año_f'].dropna().unique().astype(int).tolist(), reverse=True)
             sel_año = st.selectbox("Año:", años_db if años_db else [datetime.now().year])
@@ -95,8 +100,13 @@ if choice == "Dashboard":
             sel_mes = st.selectbox("Mes:", meses_esp, index=datetime.now().month - 1)
             
         df_f = df_eval[(df_eval['año_f'] == sel_año) & (df_eval['mes_f'] == sel_mes)].copy()
+        
         if sel_camp != "Ver Todas":
             df_f = df_f[df_f.iloc[:, 1] == sel_camp]
+        
+        # AJUSTE PARA AGENTE: Solo ve sus propios registros
+        if user['rol'] == 'Agente':
+            df_f = df_f[df_f.iloc[:, 2] == user['username']]
             
         if df_f.empty:
             st.warning(f"No hay datos para {sel_mes} de {sel_año}.")
@@ -118,11 +128,10 @@ if choice == "Dashboard":
             else:
                 fig = px.bar(df_f.groupby(df_f.columns[2])['score_final'].mean().reset_index(), 
                              x=df_f.columns[2], y='score_final', 
-                             title=f"Desempeño de Agentes en {sel_camp}", text_auto='.1f',
+                             title=f"Desempeño en {sel_camp}", text_auto='.1f',
                              color='score_final', color_continuous_scale=color_scale)
                 st.plotly_chart(fig, use_container_width=True)
                 
-                # --- GRÁFICA CORREGIDA: LOGRO REAL INDIVIDUAL ---
                 st.divider()
                 st.subheader(f"🔍 Cumplimiento por Atributo: {sel_camp}")
                 
@@ -130,11 +139,7 @@ if choice == "Dashboard":
                 pregs_camp = df_sc[df_sc.iloc[:,0] == sel_camp].copy()
                 
                 if not pregs_camp.empty:
-                    # Ajuste solicitado: Si es igual a SI pone calificación, si es NO pone CERO.
-                    # Calculamos el ratio de cumplimiento de la campaña para ponderar los puntos.
                     ratio_cumplimiento = (df_f['p_obt'].sum() / df_f['p_max'].sum())
-                    
-                    # Si el ratio es 1 (100%), todos tienen sus puntos. Si es 0, todos tienen 0.
                     pregs_camp['Puntos Logrados'] = pregs_camp.iloc[:, 2] * ratio_cumplimiento
 
                     fig_items = px.bar(pregs_camp, 
@@ -144,7 +149,7 @@ if choice == "Dashboard":
                                        text_auto='.1f',
                                        labels={'Puntos Logrados': 'Calificación', pregs_camp.columns[1]: 'Atributo'},
                                        color='Puntos Logrados', 
-                                       color_continuous_scale=['#D3D3D3', '#1F77B4']) # Colores originales
+                                       color_continuous_scale=['#D3D3D3', '#1F77B4'])
                     
                     st.plotly_chart(fig_items, use_container_width=True)
                 else:
