@@ -80,13 +80,15 @@ elif choice == "Evaluador":
     with col_date1:
         fecha_interaccion = st.date_input("📅 Fecha de la Interacción # --- 4. MÓDULOS (DASHBOARD - GRÁFICA DE CUMPLIMIENTO POR ATRIBUTO) ---
 
+# --- 4. MÓDULOS (DASHBOARD - GRÁFICA DE CUMPLIMIENTO POR ATRIBUTO) ---
+
 if choice == "Dashboard":
     st.header("📊 Analítica de Calidad")
     df_eval = get_data("evaluaciones")
     if df_eval.empty:
         st.info("Sin datos registrados aún.")
     else:
-        # Procesamiento de fechas y filtros (se mantiene igual)
+        # Procesamiento de fechas
         df_eval['fecha_dt'] = pd.to_datetime(df_eval.iloc[:, 0], errors='coerce')
         df_eval['año_f'] = df_eval['fecha_dt'].dt.year
         df_eval['mes_n'] = df_eval['fecha_dt'].dt.month_name()
@@ -113,7 +115,7 @@ if choice == "Dashboard":
         if df_f.empty:
             st.warning(f"No hay datos para {sel_mes} de {sel_año}.")
         else:
-            # Cálculos de Score General
+            # Cálculos de Score
             df_f['p_obt'] = pd.to_numeric(df_f.iloc[:, 4], errors='coerce').fillna(0)
             df_f['p_max'] = pd.to_numeric(df_f.iloc[:, 5], errors='coerce').fillna(1)
             df_f['score_final'] = (df_f['p_obt'] / df_f['p_max']) * 100
@@ -136,53 +138,32 @@ if choice == "Dashboard":
                              color='score_final', color_continuous_scale=color_scale)
                 st.plotly_chart(fig, use_container_width=True)
                 
-                # --- GRÁFICA CORREGIDA: CUMPLIMIENTO POR ATRIBUTO ---
+                # --- GRÁFICA: CUMPLIMIENTO POR ATRIBUTO ---
                 st.divider()
                 st.subheader(f"🔍 Cumplimiento por Atributo: {sel_camp}")
                 
-                # Para mostrar la "calificación obtenida" por pregunta, necesitamos los datos de la scorecard
                 df_sc = get_data("scorecards")
                 pregs_camp = df_sc[df_sc.iloc[:,0] == sel_camp].copy()
                 
                 if not pregs_camp.empty:
-                    # Cálculo de cumplimiento real:
-                    # Nota: Como cada evaluación es un total, para sacar el detalle por pregunta
-                    # comparamos el promedio de puntos obtenidos vs el valor máximo de la pregunta.
-                    
-                    # Para fines visuales y de análisis de cumplimiento:
-                    # Multiplicamos el promedio de aciertos (score_final) por el peso del item
-                    # O mostramos directamente el % de cumplimiento del item.
-                    
-                    pregs_camp['Cumplimiento %'] = df_f['score_final'].mean() 
-                    # Nota: Si en el futuro guardamos el detalle por pregunta en el Sheets, 
-                    # aquí graficaríamos esa columna específica. Por ahora, graficamos el desempeño real.
+                    # Usamos el promedio de la campaña actual para el cumplimiento
+                    promedio_camp = df_f['score_final'].mean()
+                    pregs_camp['Cumplimiento %'] = promedio_camp
 
                     fig_items = px.bar(pregs_camp, 
                                        x='Cumplimiento %', y=pregs_camp.columns[1], 
                                        orientation='h', 
                                        title="Porcentaje de Logro por Item",
-                                       text_auto='.1f', # Muestra el % obtenido
+                                       text_auto='.1f',
                                        labels={'Cumplimiento %': 'Calificación (%)', pregs_camp.columns[1]: 'Atributo'},
                                        color='Cumplimiento %', 
                                        color_continuous_scale=['#B0C4DE', '#4682B4']) 
                     
-                    fig_items.update_xaxes(range=[0, 105]) # Forzamos escala de 0 a 100
+                    fig_items.update_xaxes(range=[0, 105])
                     st.plotly_chart(fig_items, use_container_width=True)
                 else:
-                    st.info("No hay detalles de preguntas para esta campaña.")/ Llamada", datetime.now(), key="fecha_auditoria")
-    
-    # 2. Filtrado de Campaña
-    lista_c_completa = df_c.iloc[:,0].tolist() if not df_c.empty else ["General"]
-    c_opciones = [user['campaña']] if user['campaña'] != "Todas" else lista_c_completa
-    c_sel = st.selectbox("Campaña", c_opciones, key="sel_camp_eval")
-    
-    # 3. Filtrado de Agentes
-    ags = df_u[(df_u.iloc[:,3].astype(str).str.lower() == 'agente') & (df_u.iloc[:,4] == c_sel)]
-    ag_list = (ags.iloc[:,0].astype(str) + " - " + ags.iloc[:,1].astype(str)).tolist()
-    ag_sel = st.selectbox("Agente", ag_list if ag_list else ["Sin agentes en esta campaña"], key="sel_agente_eval")
-
-    st.divider()
-
+                    st.info("No hay detalles de preguntas para esta campaña.")
+                                          
     # 4. Formulario de Evaluación con KEY ÚNICA para evitar el error
     with st.form("form_eval_v2", clear_on_submit=True): # Añadimos KEY única
         pregs = df_sc[df_sc.iloc[:,0] == c_sel]
@@ -235,6 +216,7 @@ if choice == "Dashboard":
                 requests.post(URL_SCRIPT, json=payload)
                 st.success(f"✅ Guardado con fecha {fecha_interaccion.strftime('%d/%m/%Y')}. Limpiando formulario...")
                 # No es necesario st.rerun aquí porque clear_on_submit ayuda, pero puedes ponerlo si prefieres
+
 elif choice == "Gestión Campañas":
     st.header("📁 Administración de Campañas")
     df_c = get_data("campañas")
