@@ -68,19 +68,21 @@ if st.sidebar.button("🚪 Cerrar Sesión"):
     st.rerun()
 
 # --- 4. MÓDULOS ---
-
 if choice == "Dashboard":
     st.header("📊 Analítica de Calidad")
     df_eval = get_data("evaluaciones")
     if df_eval.empty:
         st.info("Sin datos registrados aún.")
     else:
+        # Procesamiento de fechas
         df_eval['fecha_dt'] = pd.to_datetime(df_eval.iloc[:, 0], errors='coerce')
         df_eval['año_f'] = df_eval['fecha_dt'].dt.year
         df_eval['mes_n'] = df_eval['fecha_dt'].dt.month_name()
+        
         meses_esp = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
         dic_meses = dict(zip(["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"], meses_esp))
         df_eval['mes_f'] = df_eval['mes_n'].map(dic_meses)
+        
         col_f1, col_f2, col_f3 = st.columns(3)
         with col_f1:
             df_c_list = get_data("campañas")
@@ -91,21 +93,55 @@ if choice == "Dashboard":
             sel_año = st.selectbox("Año:", años_db if años_db else [datetime.now().year])
         with col_f3:
             sel_mes = st.selectbox("Mes:", meses_esp, index=datetime.now().month - 1)
+            
         df_f = df_eval[(df_eval['año_f'] == sel_año) & (df_eval['mes_f'] == sel_mes)].copy()
         if sel_camp != "Ver Todas":
             df_f = df_f[df_f.iloc[:, 1] == sel_camp]
+            
         if df_f.empty:
             st.warning(f"No hay datos para {sel_mes} de {sel_año}.")
         else:
+            # Cálculos de Score
             df_f['p_obt'] = pd.to_numeric(df_f.iloc[:, 4], errors='coerce').fillna(0)
             df_f['p_max'] = pd.to_numeric(df_f.iloc[:, 5], errors='coerce').fillna(1)
             df_f['score_final'] = (df_f['p_obt'] / df_f['p_max']) * 100
-            st.metric("Total Monitoreos", len(df_f))
+            
+            st.metric("Total Monitoreos", len(df_f), f"{df_f['score_final'].mean():.1f}% Promedio")
+            
+            # Gráfica 1: Desempeño General
             if sel_camp == "Ver Todas":
-                fig = px.bar(df_f.groupby(df_f.columns[1])['score_final'].mean().reset_index(), x=df_f.columns[1], y='score_final', title="Promedio Global por Campaña", color='score_final', text_auto='.1f')
+                fig = px.bar(df_f.groupby(df_f.columns[1])['score_final'].mean().reset_index(), 
+                             x=df_f.columns[1], y='score_final', 
+                             title="Promedio Global por Campaña", color='score_final', text_auto='.1f',
+                             color_continuous_scale='RdYlGn')
+                st.plotly_chart(fig, use_container_width=True)
             else:
-                fig = px.bar(df_f.groupby(df_f.columns[2])['score_final'].mean().reset_index(), x=df_f.columns[2], y='score_final', title=f"Desempeño en {sel_camp}", color='score_final', text_auto='.1f')
-            st.plotly_chart(fig, use_container_width=True)
+                fig = px.bar(df_f.groupby(df_f.columns[2])['score_final'].mean().reset_index(), 
+                             x=df_f.columns[2], y='score_final', 
+                             title=f"Desempeño de Agentes en {sel_camp}", color='score_final', text_auto='.1f',
+                             color_continuous_scale='RdYlGn')
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # --- NUEVA GRÁFICA: ANÁLISIS POR PREGUNTA ---
+                st.divider()
+                st.subheader(f"🔍 Análisis Detallado de Scorecard: {sel_camp}")
+                
+                # Para esta gráfica necesitamos cruzar con la configuración de la scorecard
+                df_sc = get_data("scorecards")
+                pregs_camp = df_sc[df_sc.iloc[:,0] == sel_camp]
+                
+                if not pregs_camp.empty:
+                    # Simulamos o calculamos el cumplimiento por item si los datos están disponibles
+                    # Nota: Esto asume que el reporte de evaluaciones guarda el detalle o lo calculamos del total
+                    # Para una visualización clara, mostramos los items configurados y su peso
+                    fig_items = px.bar(pregs_camp, 
+                                       x=pregs_camp.columns[2], y=pregs_camp.columns[1], 
+                                       orientation='h', title="Distribución de Pesos por Pregunta",
+                                       labels={pregs_camp.columns[2]: 'Puntos', pregs_camp.columns[1]: 'Pregunta'},
+                                       color=pregs_camp.columns[2], color_continuous_scale='Viridis')
+                    st.plotly_chart(fig_items, use_container_width=True)
+                else:
+                    st.info("No hay detalles de preguntas para mostrar en esta campaña.")
 
 # [BLOQUE EVALUADOR - CON SISTEMA DE AVANCE/SCORE EN TIEMPO REAL]
 elif choice == "Evaluador":
