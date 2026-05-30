@@ -175,71 +175,87 @@ if choice == "Dashboard":
                     st.info("Configura el Scorecard en el menú correspondiente para ver este análisis.")
 
 elif choice == "Evaluador":
-    st.header("📝 Módulo de Evaluación")
-    df_u = get_data("usuarios")
-    df_c = get_data("campañas")
-    df_sc = get_data("scorecards")
-    
-    col_date1, col_date2 = st.columns(2)
-    with col_date1:
-        fecha_interaccion = st.date_input("📅 Fecha de la Interacción", datetime.now(), key="fecha_auditoria")
-    
-    lista_c_completa = df_c.iloc[:,0].tolist() if not df_c.empty else ["General"]
-    c_opciones = [user['campaña']] if user['campaña'] != "Todas" else lista_c_completa
-    c_sel = st.selectbox("Campaña", c_opciones, key="sel_camp_eval")
-    
-    ags = df_u[(df_u.iloc[:,3].astype(str).str.lower() == 'agente') & (df_u.iloc[:,4] == c_sel)]
-    ag_list = (ags.iloc[:,0].astype(str) + " - " + ags.iloc[:,1].astype(str)).tolist()
-    ag_sel = st.selectbox("Agente", ag_list if ag_list else ["Sin agentes en esta campaña"], key="sel_agente_eval")
-
-    st.divider()
-
-    with st.form("form_eval_v2", clear_on_submit=True):
-        pregs = df_sc[df_sc.iloc[:,0] == c_sel]
-        resps = {}
+        st.header("📝 Módulo de Evaluación")
+        df_u = get_data("usuarios")
+        df_c = get_data("campañas")
+        df_sc = get_data("scorecards")
         
-        if pregs.empty:
-            st.info(f"No hay preguntas configuradas para {c_sel}")
-        else:
-            for _, r in pregs.iterrows():
-                opcion = st.radio(f"{r.iloc[1]} ({r.iloc[2]} pts)", ["Si", "No"], horizontal=True, key=f"radio_{r.iloc[1]}")
-                resps[r.iloc[1]] = int(r.iloc[2]) if opcion == "Si" else 0
-            
-            puntos_actuales = sum(resps.values())
-            puntos_totales = sum(pregs.iloc[:,2])
-            porcentaje = (puntos_actuales / puntos_totales * 100) if puntos_totales > 0 else 0
-            
-            st.subheader("📊 Avance de la Evaluación")
-            st.progress(porcentaje / 100)
-            
-            if porcentaje < 70:
-                st.error(f"Score actual: {porcentaje:.1f}% - ESTADO: MAL 🔴")
-            elif porcentaje < 90:
-                st.warning(f"Score actual: {porcentaje:.1f}% - ESTADO: REGULAR 🟡")
-            else:
-                st.success(f"Score actual: {porcentaje:.1f}% - ESTADO: BIEN 🟢")
-
-        obs = st.text_area("Observaciones", key="obs_eval")
+        col_date1, col_date2 = st.columns(2)
+        with col_date1:
+            fecha_interaccion = st.date_input("📅 Fecha de la Interacción", datetime.now(), key="fecha_auditoria")
         
-        if st.form_submit_button("Guardar Evaluación"):
-            if not ag_list or "Sin agentes" in ag_sel:
-                st.error("No puedes guardar sin un agente válido.")
-            elif pregs.empty:
-                st.error("No hay preguntas para evaluar.")
+        # Filtrado de campañas según rol
+        lista_c_completa = df_c.iloc[:,0].tolist() if not df_c.empty else ["General"]
+        c_opciones = [user['campaña']] if user['campaña'] != "Todas" else lista_c_completa
+        c_sel = st.selectbox("Campaña", c_opciones, key="sel_camp_eval")
+        
+        # Filtrado de agentes por campaña
+        ags = df_u[(df_u.iloc[:,3].astype(str).str.lower() == 'agente') & (df_u.iloc[:,4] == c_sel)]
+        ag_list = (ags.iloc[:,0].astype(str) + " - " + ags.iloc[:,1].astype(str)).tolist()
+        ag_sel = st.selectbox("Agente", ag_list if ag_list else ["Sin agentes en esta campaña"], key="sel_agente_eval")
+
+        st.divider()
+
+        with st.form("form_eval_v2", clear_on_submit=True):
+            pregs = df_sc[df_sc.iloc[:,0] == c_sel]
+            resps = {}
+            
+            if pregs.empty:
+                st.info(f"⚠️ No hay preguntas configuradas para la campaña: {c_sel}")
             else:
-                payload = {
-                    "target_sheet": "evaluaciones", 
-                    "action": "create", 
-                    "fecha_registro": fecha_interaccion.strftime("%d/%m/%Y"), 
-                    "agente": ag_sel.split(" - ")[0], 
-                    "puntos_obtenidos": puntos_actuales, 
-                    "puntos_maximos": puntos_totales, 
-                    "evaluador": user['username'], 
-                    "observaciones": obs, 
-                    "campaña": c_sel
-                }
-                requests.post(URL_SCRIPT, json=payload)
-                st.success(f"✅ Guardado con fecha {fecha_interaccion.strftime('%d/%m/%Y')}.")
+                # Sección de preguntas
+                for _, r in pregs.iterrows():
+                    opcion = st.radio(f"{r.iloc[1]} ({r.iloc[2]} pts)", ["Si", "No"], horizontal=True, key=f"radio_{r.iloc[1]}")
+                    resps[r.iloc[1]] = int(r.iloc[2]) if opcion == "Si" else 0
+                
+                # Cálculos en tiempo real dentro del formulario
+                puntos_actuales = sum(resps.values())
+                puntos_totales = sum(pregs.iloc[:,2])
+                porcentaje = (puntos_actuales / puntos_totales * 100) if puntos_totales > 0 else 0
+                
+                st.subheader("📊 Avance de la Evaluación")
+                st.progress(porcentaje / 100)
+                
+                # Semáforo de estado
+                if porcentaje < 70:
+                    st.error(f"Score actual: {porcentaje:.1f}% - ESTADO: MAL 🔴")
+                elif porcentaje < 90:
+                    st.warning(f"Score actual: {porcentaje:.1f}% - ESTADO: REGULAR 🟡")
+                else:
+                    st.success(f"Score actual: {porcentaje:.1f}% - ESTADO: BIEN 🟢")
+
+            obs = st.text_area("Observaciones / Retroalimentación", help="Estos comentarios los podrá ver el agente en su Dashboard", key="obs_eval")
+            
+            # Lógica de guardado
+            if st.form_submit_button("Guardar Evaluación"):
+                if not ag_list or "Sin agentes" in ag_sel:
+                    st.error("❌ Error: Debes seleccionar un agente válido para guardar.")
+                elif pregs.empty:
+                    st.error("❌ Error: No se puede evaluar una campaña sin scorecard configurado.")
+                else:
+                    try:
+                        payload = {
+                            "target_sheet": "evaluaciones", 
+                            "action": "create", 
+                            "fecha_registro": fecha_interaccion.strftime("%d/%m/%Y"), 
+                            "agente": ag_sel.split(" - ")[0], 
+                            "puntos_obtenidos": puntos_actuales, 
+                            "puntos_maximos": puntos_totales, 
+                            "evaluador": user['username'], 
+                            "observaciones": obs if obs else "Sin observaciones", 
+                            "campaña": c_sel
+                        }
+                        # Envío al Web App de Google Apps Script
+                        response = requests.post(URL_SCRIPT, json=payload)
+                        
+                        if response.status_code == 200:
+                            st.success(f"✅ Evaluación guardada correctamente para {ag_sel} con fecha {fecha_interaccion.strftime('%d/%m/%Y')}.")
+                            # Opcional: st.balloons() para feedback visual de éxito
+                        else:
+                            st.error("⚠️ Error de conexión con el servidor. Intenta de nuevo.")
+                    except Exception as e:
+                        st.error(f"❌ Error al procesar el guardado: {e}")
+
 
 elif choice == "Gestión Campañas":
     st.header("📁 Administración de Campañas")
