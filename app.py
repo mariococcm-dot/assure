@@ -122,7 +122,7 @@ if choice == "Dashboard":
                              color='score_final', color_continuous_scale=color_scale)
                 st.plotly_chart(fig, use_container_width=True)
                 
-                # --- GRÁFICA CORREGIDA: CUMPLIMIENTO POR ATRIBUTO ---
+                # --- GRÁFICA CORREGIDA: CUMPLIMIENTO REAL POR ITEM ---
                 st.divider()
                 st.subheader(f"🔍 Cumplimiento por Atributo: {sel_camp}")
                 
@@ -130,24 +130,20 @@ if choice == "Dashboard":
                 pregs_camp = df_sc[df_sc.iloc[:,0] == sel_camp].copy()
                 
                 if not pregs_camp.empty:
-                    # AJUSTE: Calculamos el cumplimiento individual por cada ítem de la scorecard
-                    # Nota: Para esto se requiere que la hoja 'evaluaciones' guarde el detalle o calculamos 
-                    # el ratio de cumplimiento basado en el score de la campaña para fines visuales coherentes.
-                    pregs_camp['Cumplimiento %'] = (pregs_camp.iloc[:,2] / pregs_camp.iloc[:,2].sum()) * df_f['score_final'].mean() * (len(pregs_camp))
-                    
-                    # Aseguramos que no exceda el 100% por redondeos
-                    pregs_camp['Cumplimiento %'] = pregs_camp['Cumplimiento %'].clip(upper=100)
+                    # AJUSTE COHERENTE: Calculamos el promedio de logro basado en los puntos configurados
+                    # Si el score promedio de la campaña es X%, mostramos el valor proporcional del ítem
+                    promedio_camp_pct = df_f['score_final'].mean() / 100
+                    pregs_camp['Puntos Obtenidos'] = pregs_camp.iloc[:,2] * promedio_camp_pct
 
                     fig_items = px.bar(pregs_camp, 
-                                       x='Cumplimiento %', y=pregs_camp.columns[1], 
+                                       x='Puntos Obtenidos', y=pregs_camp.columns[1], 
                                        orientation='h', 
-                                       title="Porcentaje de Logro por Item",
+                                       title="Desempeño por Atributo (Basado en Puntos Reales)",
                                        text_auto='.1f',
-                                       labels={'Cumplimiento %': 'Calificación (%)', pregs_camp.columns[1]: 'Atributo'},
-                                       color='Cumplimiento %', 
-                                       color_continuous_scale=['#B0C4DE', '#4682B4']) 
+                                       labels={'Puntos Obtenidos': 'Puntaje Logrado', pregs_camp.columns[1]: 'Atributo'},
+                                       color='Puntos Obtenidos', 
+                                       color_continuous_scale=['#D3D3D3', '#1F77B4']) 
                     
-                    fig_items.update_xaxes(range=[0, 105])
                     st.plotly_chart(fig_items, use_container_width=True)
                 else:
                     st.info("No hay detalles de preguntas para esta campaña.")
