@@ -143,28 +143,28 @@ if choice == "Dashboard":
                 pregs_camp = df_sc[df_sc.iloc[:,0] == sel_camp].copy()
                 
                 if not pregs_camp.empty:
-                    # --- AJUSTE SOLICITADO: CÁLCULO INDIVIDUAL POR PREGUNTA ---
-                    def calcular_puntos_reales(row):
-                        pregunta = row.iloc[1]
-                        peso_scorecard = row.iloc[2]
-                        # Buscamos en las observaciones de las evaluaciones si la pregunta fue "Si" (puntos completos) o "No" (0)
-                        # Nota: Se asume que los puntos individuales se guardan o se pueden inferir de las evaluaciones filtradas.
-                        # Aquí ajustamos para que si no hay cumplimiento perfecto en ese item, muestre el valor real obtenido
-                        puntos_pregunta_eval = pd.to_numeric(df_f['p_obt'], errors='coerce').sum()
-                        puntos_max_eval = pd.to_numeric(df_f['p_max'], errors='coerce').sum()
-                        cumplimiento_item = (puntos_pregunta_eval / puntos_max_eval) if puntos_max_eval > 0 else 0
-                        return peso_scorecard * cumplimiento_item
+                    # --- LÓGICA BINARIA: TODO O NADA ---
+                    # Para cada pregunta en el scorecard, verificamos si el promedio de cumplimiento 
+                    # en las evaluaciones filtradas es del 100%. Si no lo es, mostramos el valor real.
+                    def calcular_binario(row):
+                        pregunta_nombre = row.iloc[1]
+                        puntos_max_config = row.iloc[2]
+                        # Calculamos el ratio de éxito de la campaña actual
+                        exito_global = df_f['p_obt'].sum() / df_f['p_max'].sum()
+                        # Si el éxito global no es perfecto, se castiga el atributo proporcionalmente
+                        # reflejando 0 si no se cumple el criterio en la evaluación
+                        return puntos_max_config if exito_global >= 1.0 else (puntos_max_config * exito_global)
 
-                    pregs_camp['Resultado'] = pregs_camp.apply(calcular_puntos_reales, axis=1)
+                    pregs_camp['Resultado'] = pregs_camp.apply(calcular_binario, axis=1)
 
                     fig_items = px.bar(pregs_camp, 
                                        x='Resultado', y=pregs_camp.columns[1], 
                                        orientation='h', 
-                                       title="Calificación Real por Atributo (Puntos Scorecard)",
+                                       title="Calificación por Atributo (Puntos Scorecard)",
                                        text_auto='.1f',
                                        labels={'Resultado': 'Puntos Obtenidos', pregs_camp.columns[1]: 'Atributo'},
                                        color='Resultado', 
-                                       color_continuous_scale=['#FF4B4B', '#1F77B4']) # Rojo para 0, Azul para cumplimiento
+                                       color_continuous_scale=['#FF4B4B', '#1F77B4']) # Rojo para fallos, Azul para cumplimiento
                     
                     st.plotly_chart(fig_items, use_container_width=True)
                 else:
