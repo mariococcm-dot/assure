@@ -143,19 +143,13 @@ if choice == "Dashboard":
                 pregs_camp = df_sc[df_sc.iloc[:,0] == sel_camp].copy()
                 
                 if not pregs_camp.empty:
-                    # --- LÓGICA BINARIA: TODO O NADA ---
-                    # Para cada pregunta en el scorecard, verificamos si el promedio de cumplimiento 
-                    # en las evaluaciones filtradas es del 100%. Si no lo es, mostramos el valor real.
-                    def calcular_binario(row):
-                        pregunta_nombre = row.iloc[1]
-                        puntos_max_config = row.iloc[2]
-                        # Calculamos el ratio de éxito de la campaña actual
-                        exito_global = df_f['p_obt'].sum() / df_f['p_max'].sum()
-                        # Si el éxito global no es perfecto, se castiga el atributo proporcionalmente
-                        # reflejando 0 si no se cumple el criterio en la evaluación
-                        return puntos_max_config if exito_global >= 1.0 else (puntos_max_config * exito_global)
-
-                    pregs_camp['Resultado'] = pregs_camp.apply(calcular_binario, axis=1)
+                    # --- CORRECCIÓN DEFINITIVA DE LÓGICA ---
+                    # Calculamos el % de cumplimiento real de las evaluaciones filtradas
+                    ratio_real = df_f['p_obt'].sum() / df_f['p_max'].sum() if df_f['p_max'].sum() > 0 else 0
+                    
+                    # Si el ratio no es 1 (100%), significa que hubo fallos. 
+                    # El gráfico ahora multiplica el peso de la pregunta por su cumplimiento real.
+                    pregs_camp['Resultado'] = pregs_camp.iloc[:, 2] * ratio_real
 
                     fig_items = px.bar(pregs_camp, 
                                        x='Resultado', y=pregs_camp.columns[1], 
@@ -164,7 +158,7 @@ if choice == "Dashboard":
                                        text_auto='.1f',
                                        labels={'Resultado': 'Puntos Obtenidos', pregs_camp.columns[1]: 'Atributo'},
                                        color='Resultado', 
-                                       color_continuous_scale=['#FF4B4B', '#1F77B4']) # Rojo para fallos, Azul para cumplimiento
+                                       color_continuous_scale=['#FF4B4B', '#1F77B4']) 
                     
                     st.plotly_chart(fig_items, use_container_width=True)
                 else:
