@@ -67,20 +67,7 @@ if st.sidebar.button("🚪 Cerrar Sesión"):
     st.session_state["autenticado"] = False
     st.rerun()
 
-
-# [BLOQUE EVALUADOR - CORREGIDO ERROR DE FORMULARIO DUPLICADO]
-elif choice == "Evaluador":
-    st.header("📝 Módulo de Evaluación")
-    df_u = get_data("usuarios")
-    df_c = get_data("campañas")
-    df_sc = get_data("scorecards")
-    
-    # 1. Campo Fecha de Interacción (Fuera del form para evitar errores de renderizado)
-    col_date1, col_date2 = st.columns(2)
-    with col_date1:
-        fecha_interaccion = st.date_input("📅 Fecha de la Interacción # --- 4. MÓDULOS (DASHBOARD - GRÁFICA DE CUMPLIMIENTO POR ATRIBUTO) ---
-
-# --- 4. MÓDULOS (DASHBOARD - GRÁFICA DE CUMPLIMIENTO POR ATRIBUTO) ---
+# --- 4. MÓDULOS ---
 
 if choice == "Dashboard":
     st.header("📊 Analítica de Calidad")
@@ -88,7 +75,6 @@ if choice == "Dashboard":
     if df_eval.empty:
         st.info("Sin datos registrados aún.")
     else:
-        # Procesamiento de fechas
         df_eval['fecha_dt'] = pd.to_datetime(df_eval.iloc[:, 0], errors='coerce')
         df_eval['año_f'] = df_eval['fecha_dt'].dt.year
         df_eval['mes_n'] = df_eval['fecha_dt'].dt.month_name()
@@ -115,7 +101,6 @@ if choice == "Dashboard":
         if df_f.empty:
             st.warning(f"No hay datos para {sel_mes} de {sel_año}.")
         else:
-            # Cálculos de Score
             df_f['p_obt'] = pd.to_numeric(df_f.iloc[:, 4], errors='coerce').fillna(0)
             df_f['p_max'] = pd.to_numeric(df_f.iloc[:, 5], errors='coerce').fillna(1)
             df_f['score_final'] = (df_f['p_obt'] / df_f['p_max']) * 100
@@ -124,7 +109,6 @@ if choice == "Dashboard":
             
             color_scale = ['#D3D3D3', '#1F77B4'] 
 
-            # Gráfica 1: Desempeño General
             if sel_camp == "Ver Todas":
                 fig = px.bar(df_f.groupby(df_f.columns[1])['score_final'].mean().reset_index(), 
                              x=df_f.columns[1], y='score_final', 
@@ -138,7 +122,6 @@ if choice == "Dashboard":
                              color='score_final', color_continuous_scale=color_scale)
                 st.plotly_chart(fig, use_container_width=True)
                 
-                # --- GRÁFICA: CUMPLIMIENTO POR ATRIBUTO ---
                 st.divider()
                 st.subheader(f"🔍 Cumplimiento por Atributo: {sel_camp}")
                 
@@ -146,7 +129,6 @@ if choice == "Dashboard":
                 pregs_camp = df_sc[df_sc.iloc[:,0] == sel_camp].copy()
                 
                 if not pregs_camp.empty:
-                    # Usamos el promedio de la campaña actual para el cumplimiento
                     promedio_camp = df_f['score_final'].mean()
                     pregs_camp['Cumplimiento %'] = promedio_camp
 
@@ -163,9 +145,28 @@ if choice == "Dashboard":
                     st.plotly_chart(fig_items, use_container_width=True)
                 else:
                     st.info("No hay detalles de preguntas para esta campaña.")
-                                          
-    # 4. Formulario de Evaluación con KEY ÚNICA para evitar el error
-    with st.form("form_eval_v2", clear_on_submit=True): # Añadimos KEY única
+
+elif choice == "Evaluador":
+    st.header("📝 Módulo de Evaluación")
+    df_u = get_data("usuarios")
+    df_c = get_data("campañas")
+    df_sc = get_data("scorecards")
+    
+    col_date1, col_date2 = st.columns(2)
+    with col_date1:
+        fecha_interaccion = st.date_input("📅 Fecha de la Interacción", datetime.now(), key="fecha_auditoria")
+    
+    lista_c_completa = df_c.iloc[:,0].tolist() if not df_c.empty else ["General"]
+    c_opciones = [user['campaña']] if user['campaña'] != "Todas" else lista_c_completa
+    c_sel = st.selectbox("Campaña", c_opciones, key="sel_camp_eval")
+    
+    ags = df_u[(df_u.iloc[:,3].astype(str).str.lower() == 'agente') & (df_u.iloc[:,4] == c_sel)]
+    ag_list = (ags.iloc[:,0].astype(str) + " - " + ags.iloc[:,1].astype(str)).tolist()
+    ag_sel = st.selectbox("Agente", ag_list if ag_list else ["Sin agentes en esta campaña"], key="sel_agente_eval")
+
+    st.divider()
+
+    with st.form("form_eval_v2", clear_on_submit=True):
         pregs = df_sc[df_sc.iloc[:,0] == c_sel]
         resps = {}
         
@@ -173,11 +174,9 @@ if choice == "Dashboard":
             st.info(f"No hay preguntas configuradas para {c_sel}")
         else:
             for _, r in pregs.iterrows():
-                # Cada radio también lleva una key única basada en la pregunta
                 opcion = st.radio(f"{r.iloc[1]} ({r.iloc[2]} pts)", ["Si", "No"], horizontal=True, key=f"radio_{r.iloc[1]}")
                 resps[r.iloc[1]] = int(r.iloc[2]) if opcion == "Si" else 0
             
-            # Cálculo de Avance (Ahora dentro de un contenedor para que se vea bien)
             puntos_actuales = sum(resps.values())
             puntos_totales = sum(pregs.iloc[:,2])
             porcentaje = (puntos_actuales / puntos_totales * 100) if puntos_totales > 0 else 0
@@ -194,9 +193,7 @@ if choice == "Dashboard":
 
         obs = st.text_area("Observaciones", key="obs_eval")
         
-        btn_guardar = st.form_submit_button("Guardar Evaluación")
-        
-        if btn_guardar:
+        if st.form_submit_button("Guardar Evaluación"):
             if not ag_list or "Sin agentes" in ag_sel:
                 st.error("No puedes guardar sin un agente válido.")
             elif pregs.empty:
@@ -214,8 +211,7 @@ if choice == "Dashboard":
                     "campaña": c_sel
                 }
                 requests.post(URL_SCRIPT, json=payload)
-                st.success(f"✅ Guardado con fecha {fecha_interaccion.strftime('%d/%m/%Y')}. Limpiando formulario...")
-                # No es necesario st.rerun aquí porque clear_on_submit ayuda, pero puedes ponerlo si prefieres
+                st.success(f"✅ Guardado con fecha {fecha_interaccion.strftime('%d/%m/%Y')}.")
 
 elif choice == "Gestión Campañas":
     st.header("📁 Administración de Campañas")
@@ -273,7 +269,6 @@ elif choice == "Gestión Usuarios":
     with col_r:
         st.dataframe(df_u, use_container_width=True, hide_index=True)
 
-# [BLOQUE CONFIG SCORECARDS - ELIMINACIÓN TOTAL Y LIMPIEZA DE LISTADO]
 elif choice == "Config Scorecards":
     st.header("⚙️ Scorecards")
     df_sc = get_data("scorecards")
@@ -283,7 +278,6 @@ elif choice == "Config Scorecards":
     with col_l:
         with st.container(border=True):
             st.subheader("Configurar Criterio")
-            # Lista de campañas actualizada
             c_list = df_c.iloc[:,0].tolist() if not df_c.empty else ["General"]
             c_sc = st.selectbox("Campaña", c_list)
             
@@ -305,8 +299,6 @@ elif choice == "Config Scorecards":
             st.divider()
             if not df_sc.empty:
                 st.subheader("Gestión de Scorecard")
-                
-                # Acción 1: Eliminar Item Individual
                 criterios_camp = df_sc[df_sc.iloc[:,0] == c_sc]
                 if not criterios_camp.empty:
                     item_sel = st.selectbox("Seleccionar Item para borrar:", criterios_camp.iloc[:,1].tolist())
@@ -320,17 +312,14 @@ elif choice == "Config Scorecards":
                         st.rerun()
                 
                 st.divider()
-                # Acción 2: ELIMINAR TOTAL (Scorecard + Campaña del listado)
                 st.error(f"⚠️ ELIMINAR CAMPAÑA: {c_sc}")
                 if st.button(f"🔥 Borrar '{c_sc}' por completo"):
-                    # 1. Borramos las preguntas en la hoja 'scorecards'
                     requests.post(URL_SCRIPT, json={
                         "target_sheet":"scorecards",
                         "action":"delete",
                         "area":c_sc,
                         "modo": "completo" 
                     })
-                    # 2. Borramos la campaña de la hoja 'campañas' para que desaparezca del desplegable
                     requests.post(URL_SCRIPT, json={
                         "target_sheet":"campañas",
                         "action":"delete",
@@ -347,9 +336,3 @@ elif choice == "Config Scorecards":
                 st.dataframe(df_sc_filtrado, use_container_width=True, hide_index=True)
             else:
                 st.info("No hay preguntas configuradas para esta campaña.")
-    
-    with col_r:
-        st.subheader(f"Configuración Actual: {c_sc}")
-        if not df_sc.empty:
-            df_sc_filtrado = df_sc[df_sc.iloc[:,0] == c_sc]
-            st.dataframe(df_sc_filtrado, use_container_width=True, hide_index=True)
