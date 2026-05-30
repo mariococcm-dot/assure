@@ -67,7 +67,7 @@ if st.sidebar.button("🚪 Cerrar Sesión"):
     st.session_state["autenticado"] = False
     st.rerun()
 
-# --- 4. MÓDULOS ---
+# --- 4. MÓDULOS (DASHBOARD - COLORES SOBRIOS Y PUNTAJES) ---
 if choice == "Dashboard":
     st.header("📊 Analítica de Calidad")
     df_eval = get_data("evaluaciones")
@@ -108,40 +108,45 @@ if choice == "Dashboard":
             
             st.metric("Total Monitoreos", len(df_f), f"{df_f['score_final'].mean():.1f}% Promedio")
             
+            # Paleta de colores sobria
+            color_scale = ['#D3D3D3', '#1F77B4'] # Gris claro a Azul corporativo
+
             # Gráfica 1: Desempeño General
             if sel_camp == "Ver Todas":
                 fig = px.bar(df_f.groupby(df_f.columns[1])['score_final'].mean().reset_index(), 
                              x=df_f.columns[1], y='score_final', 
-                             title="Promedio Global por Campaña", color='score_final', text_auto='.1f',
-                             color_continuous_scale='RdYlGn')
+                             title="Promedio Global por Campaña", text_auto='.1f',
+                             color='score_final', color_continuous_scale=color_scale)
                 st.plotly_chart(fig, use_container_width=True)
             else:
                 fig = px.bar(df_f.groupby(df_f.columns[2])['score_final'].mean().reset_index(), 
                              x=df_f.columns[2], y='score_final', 
-                             title=f"Desempeño de Agentes en {sel_camp}", color='score_final', text_auto='.1f',
-                             color_continuous_scale='RdYlGn')
+                             title=f"Desempeño de Agentes en {sel_camp}", text_auto='.1f',
+                             color='score_final', color_continuous_scale=color_scale)
                 st.plotly_chart(fig, use_container_width=True)
                 
-                # --- NUEVA GRÁFICA: ANÁLISIS POR PREGUNTA ---
+                # --- ANÁLISIS POR PREGUNTA (CON PUNTAJE EN BARRA) ---
                 st.divider()
-                st.subheader(f"🔍 Análisis Detallado de Scorecard: {sel_camp}")
+                st.subheader(f"🔍 Análisis de Criterios: {sel_camp}")
                 
-                # Para esta gráfica necesitamos cruzar con la configuración de la scorecard
                 df_sc = get_data("scorecards")
                 pregs_camp = df_sc[df_sc.iloc[:,0] == sel_camp]
                 
                 if not pregs_camp.empty:
-                    # Simulamos o calculamos el cumplimiento por item si los datos están disponibles
-                    # Nota: Esto asume que el reporte de evaluaciones guarda el detalle o lo calculamos del total
-                    # Para una visualización clara, mostramos los items configurados y su peso
+                    # Gráfica horizontal con etiquetas de puntaje (text_auto=True)
                     fig_items = px.bar(pregs_camp, 
                                        x=pregs_camp.columns[2], y=pregs_camp.columns[1], 
-                                       orientation='h', title="Distribución de Pesos por Pregunta",
+                                       orientation='h', 
+                                       title="Distribución de Pesos por Ítem",
+                                       text_auto=True, # Aquí aparece el número en la barra
                                        labels={pregs_camp.columns[2]: 'Puntos', pregs_camp.columns[1]: 'Pregunta'},
-                                       color=pregs_camp.columns[2], color_continuous_scale='Viridis')
+                                       color=pregs_camp.columns[2], 
+                                       color_continuous_scale=['#B0C4DE', '#4682B4']) # Azules acero
+                    
+                    fig_items.update_layout(yaxis={'categoryorder':'total ascending'})
                     st.plotly_chart(fig_items, use_container_width=True)
                 else:
-                    st.info("No hay detalles de preguntas para mostrar en esta campaña.")
+                    st.info("No hay detalles de preguntas para esta campaña.")
 
 # [BLOQUE EVALUADOR - CON SISTEMA DE AVANCE/SCORE EN TIEMPO REAL]
 elif choice == "Evaluador":
