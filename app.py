@@ -6,7 +6,7 @@ from datetime import datetime
 from urllib.parse import quote 
 
 # --- 1. CONFIGURACIÓN ---
-st.set_page_config(page_title="QualityScore Enterprise", layout="wide")
+st.set_page_config(page_title="Customer Care Monitoring", layout="wide")
 
 URL_SCRIPT = "https://script.google.com/macros/s/AKfycbwOzQXYSGb1aFciCb28ivzWtV9PjhITXKpacPTzpszvEoCFFcxlr5AUgn1V-g1lHyuJ/exec" 
 
@@ -27,7 +27,7 @@ if "autenticado" not in st.session_state:
     st.session_state["autenticado"] = False
 
 if not st.session_state["autenticado"]:
-    st.subheader("🔑 QualityScore Login")
+    st.subheader("🔑 Call Center de México | Quality Assurance")
     u_log = st.text_input("Usuario").strip()
     p_log = st.text_input("Contraseña", type="password").strip()
     
@@ -70,14 +70,14 @@ else: # Rol Agente
 
 choice = st.sidebar.selectbox("Menú Principal", menu)
 
-if st.sidebar.button("🚪 Cerrar Sesión"):
+if st.sidebar.button("📤 Cerrar Sesión"):
     st.session_state["autenticado"] = False
     st.rerun()
 
 # --- 4. MÓDULOS ---
 
 if choice == "Dashboard":
-        st.header("📊 Analítica de Calidad")
+        st.header("📊 Dashboard resultados")
         df_eval = get_data("evaluaciones")
         if df_eval.empty:
             st.info("Sin datos registrados aún.")
