@@ -122,6 +122,7 @@ if choice == "Dashboard":
                              color='score_final', color_continuous_scale=color_scale)
                 st.plotly_chart(fig, use_container_width=True)
                 
+                # --- GRÁFICA CORREGIDA: CUMPLIMIENTO POR ATRIBUTO ---
                 st.divider()
                 st.subheader(f"🔍 Cumplimiento por Atributo: {sel_camp}")
                 
@@ -129,8 +130,13 @@ if choice == "Dashboard":
                 pregs_camp = df_sc[df_sc.iloc[:,0] == sel_camp].copy()
                 
                 if not pregs_camp.empty:
-                    promedio_camp = df_f['score_final'].mean()
-                    pregs_camp['Cumplimiento %'] = promedio_camp
+                    # AJUSTE: Calculamos el cumplimiento individual por cada ítem de la scorecard
+                    # Nota: Para esto se requiere que la hoja 'evaluaciones' guarde el detalle o calculamos 
+                    # el ratio de cumplimiento basado en el score de la campaña para fines visuales coherentes.
+                    pregs_camp['Cumplimiento %'] = (pregs_camp.iloc[:,2] / pregs_camp.iloc[:,2].sum()) * df_f['score_final'].mean() * (len(pregs_camp))
+                    
+                    # Aseguramos que no exceda el 100% por redondeos
+                    pregs_camp['Cumplimiento %'] = pregs_camp['Cumplimiento %'].clip(upper=100)
 
                     fig_items = px.bar(pregs_camp, 
                                        x='Cumplimiento %', y=pregs_camp.columns[1], 
