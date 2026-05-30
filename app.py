@@ -148,12 +148,17 @@ if choice == "Dashboard":
                 else:
                     st.info("No hay detalles de preguntas para esta campaña.")
 
-# [BLOQUE EVALUADOR - CON SISTEMA DE AVANCE/SCORE EN TIEMPO REAL]
+# [BLOQUE EVALUADOR - CON FECHA DE INTERACCIÓN Y AVANCE]
 elif choice == "Evaluador":
     st.header("📝 Módulo de Evaluación")
     df_u = get_data("usuarios")
     df_c = get_data("campañas")
     df_sc = get_data("scorecards")
+    
+    # --- NUEVO: CAMPO FECHA DE INTERACCIÓN (CALENDARIO) ---
+    col_date1, col_date2 = st.columns(2)
+    with col_date1:
+        fecha_interaccion = st.date_input("📅 Fecha de la Interacción / Llamada", datetime.now())
     
     # --- LÓGICA DE FILTRADO DE CAMPAÑA SEGÚN EL USUARIO ---
     lista_c_completa = df_c.iloc[:,0].tolist() if not df_c.empty else ["General"]
@@ -171,6 +176,54 @@ elif choice == "Evaluador":
 
     st.divider()
 
+    # Formulario de Evaluación
+    with st.form("form_eval"):
+        pregs = df_sc[df_sc.iloc[:,0] == c_sel]
+        resps = {}
+        
+        if pregs.empty:
+            st.info(f"No hay preguntas configuradas para {c_sel}")
+        else:
+            for _, r in pregs.iterrows():
+                opcion = st.radio(f"{r.iloc[1]} ({r.iloc[2]} pts)", ["Si", "No"], horizontal=True, key=f"p_{r.iloc[1]}")
+                resps[r.iloc[1]] = int(r.iloc[2]) if opcion == "Si" else 0
+            
+            # Cálculo de Avance
+            puntos_actuales = sum(resps.values())
+            puntos_totales = sum(pregs.iloc[:,2])
+            porcentaje = (puntos_actuales / puntos_totales * 100) if puntos_totales > 0 else 0
+            
+            st.subheader("📊 Avance de la Evaluación")
+            st.progress(porcentaje / 100)
+            
+            if porcentaje < 70:
+                st.error(f"Score actual: {porcentaje:.1f}% - ESTADO: MAL 🔴")
+            elif porcentaje < 90:
+                st.warning(f"Score actual: {porcentaje:.1f}% - ESTADO: REGULAR 🟡")
+            else:
+                st.success(f"Score actual: {porcentaje:.1f}% - ESTADO: BIEN 🟢")
+
+        obs = st.text_area("Observaciones")
+        
+        if st.form_submit_button("Guardar Evaluación"):
+            if not ag_list or "Sin agentes" in ag_sel:
+                st.error("No puedes guardar sin un agente válido.")
+            elif pregs.empty:
+                st.error("No hay preguntas para evaluar.")
+            else:
+                payload = {
+                    "target_sheet": "evaluaciones", 
+                    "action": "create", 
+                    "fecha_registro": fecha_interaccion.strftime("%d/%m/%Y"), # Usamos la fecha del calendario
+                    "agente": ag_sel.split(" - ")[0], 
+                    "puntos_obtenidos": puntos_actuales, 
+                    "puntos_maximos": puntos_totales, 
+                    "evaluador": user['username'], 
+                    "observaciones": obs, 
+                    "campaña": c_sel
+                }
+                requests.post(URL_SCRIPT, json=payload)
+                st.success("✅ Evaluación guardada con fecha: " + fecha_interaccion.strftime("%d/%m/%Y"))
     # Formulario de Evaluación
     with st.form("form_eval"):
         pregs = df_sc[df_sc.iloc[:,0] == c_sel]
